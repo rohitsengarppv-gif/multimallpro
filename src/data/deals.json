@@ -1,0 +1,47 @@
+{
+  "banner": {
+    "title": "Gift Special",
+    "message": "Wrap new offers / gift every single day on Weekends - New Coupon code:",
+    "coupon": "Happy2017",
+    "cta": "Get Coupon"
+  },
+  "dailyDeals": [
+    {
+      "id": "chair-01",
+      "title": "Sweetheart Homecoming Dresses",
+      "price": 15.96,
+      "currency": "$",
+      "img": "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?q=80&w=1200&auto=format&fit=crop",
+      "available": 18,
+      "sold": 28,
+      "discount": 7
+    },
+    {
+      "id": "vase-01",
+      "title": "Minimal Ceramic Vase",
+      "price": 19.50,
+      "currency": "$",
+      "img": "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=1200&auto=format&fit=crop",
+      "available": 12,
+      "sold": 32,
+      "discount": 7
+    },
+    {
+      "id": "lamp-01",
+      "title": "Nordic Table Lamp",
+      "price": 29.99,
+      "currency": "$",
+      "img": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop",
+      "available": 20,
+      "sold": 15,
+      "discount": 7
+    }
+  ],
+  "midBanner": {
+    "badge": "75% OFF",
+    "title": "Jacquard Warp Knitted Microfiber Towel",
+    "cta": "Shop Now",
+    "img": "https://images.unsplash.com/photo-1501045661006-fcebe0257c3f?q=80&w=1600&auto=format&fit=crop"
+  },
+  "trendingTabs": ["All", "Furniture", "Electronics", "Fashion", "Beauty", "Food"]
+}
