@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Search, Menu, Heart, ShoppingCart, GitCompare, Phone, MapPin, User, ChevronDown, Zap, Tag } from "lucide-react";
+import { Search, Menu, Heart, ShoppingCart, GitCompare, Phone, MapPin, User, Zap, Tag } from "lucide-react";
 import MobileSidebar from "./MobileSidebar";
 import CartSidebar from "./CartSidebar";
 import { useCart } from "../contexts/CartContext";
@@ -9,8 +9,71 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(5);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const { isOpen: cartOpen, openCart, closeCart, getTotalItems } = useCart();
-  const cartCount = getTotalItems();
+  const contextCartCount = getTotalItems();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+    setIsLoggedIn(false);
+    // Optionally redirect to home
+    window.location.href = "/";
+  };
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const userData = localStorage.getItem("user");
+
+      if (token && userData) {
+        try {
+          const parsedUser = JSON.parse(userData);
+          setUser(parsedUser);
+          setIsLoggedIn(true);
+          // Fetch cart count when user is logged in
+          fetchCartCount(parsedUser.id);
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+          setIsLoggedIn(false);
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for storage changes (in case user logs in from another tab)
+    window.addEventListener("storage", checkAuth);
+    return () => window.removeEventListener("storage", checkAuth);
+  }, []);
+
+  // Fetch cart count from API
+  const fetchCartCount = async (userId: string) => {
+    try {
+      const response = await fetch("/api/cart", {
+        headers: { "x-user-id": userId },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCartCount(data.data.totalItems || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching cart count:", error);
+    }
+  };
+
+  // Refresh cart count when cart sidebar closes
+  useEffect(() => {
+    if (!cartOpen && isLoggedIn && user) {
+      fetchCartCount(user.id);
+    }
+  }, [cartOpen, isLoggedIn, user]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,11 +109,11 @@ export default function Header() {
             <span className="text-white/20">|</span>
             <div className="flex items-center gap-2">
               <button className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1">
-                English <ChevronDown className="h-3 w-3" />
+                English 
               </button>
               <span className="text-white/30">/</span>
               <button className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1">
-                USD <ChevronDown className="h-3 w-3" />
+                USD 
               </button>
             </div>
           </div>
@@ -104,20 +167,48 @@ export default function Header() {
           <IconButton icon={<Heart className="h-5 w-5" />} label="Wishlist" count={wishlistCount} href="/wishlist" />
           <CartButton count={cartCount} onClick={openCart} />
 
-          {/* Auth Buttons */}
+          {/* Auth Buttons / User Profile */}
           <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/20">
-            <a
-              href="/auth/login"
-              className="px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 rounded-lg transition-all duration-200 transform hover:scale-105"
-            >
-              Login
-            </a>
-            <a
-              href="/auth/register"
-              className="px-4 py-2 text-sm font-semibold bg-white text-rose-600 hover:bg-gray-100 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-            >
-              Register
-            </a>
+            {isLoggedIn && user ? (
+              <a
+                href="/profile"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                title="My Profile"
+              >
+                {user.avatar?.url ? (
+                  <img
+                    src={user.avatar.url}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full border-2 border-white/30 object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center border-2 border-white/30">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                )}
+                <div className="hidden sm:block text-left">
+                  <p className="text-sm font-semibold text-white group-hover:text-rose-400 transition-colors">
+                    {user.name}
+                  </p>
+                  <p className="text-xs text-white/70 capitalize">{user.role || 'User'}</p>
+                </div>
+              </a>
+            ) : (
+              <>
+                <a
+                  href="/auth/login"
+                  className="px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 rounded-lg transition-all duration-200 transform hover:scale-105"
+                >
+                  Login
+                </a>
+                <a
+                  href="/auth/register"
+                  className="px-4 py-2 text-sm font-semibold bg-white text-rose-600 hover:bg-gray-100 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                >
+                  Register
+                </a>
+              </>
+            )}
           </div>
         </div>
 

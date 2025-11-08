@@ -12,6 +12,7 @@ export default function LoginPage() {
   });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string>("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -50,14 +51,28 @@ export default function LoginPage() {
     
     if (!validateForm()) return;
 
+    setSubmitError("");
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/routes/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Login failed");
+      }
+      // Persist token/user as needed
+      if (data.data?.token) localStorage.setItem("token", data.data.token);
+      if (data.data?.user) localStorage.setItem("user", JSON.stringify(data.data.user));
+      // Navigate to home or account
+      window.location.href = "/";
+    } catch (err: any) {
+      setSubmitError(err.message || "Login failed");
+    } finally {
       setIsLoading(false);
-      // Handle successful login here
-      console.log("Login successful", formData);
-    }, 2000);
+    }
   };
 
   return (
@@ -84,6 +99,11 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {submitError && (
+              <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
+                {submitError}
+              </div>
+            )}
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">

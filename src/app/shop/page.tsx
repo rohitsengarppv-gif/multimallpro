@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard, { ProductCardData } from "../../components/ProductCard";
@@ -13,97 +13,25 @@ import {
   ShoppingCart,
   Search,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Loader2
 } from "lucide-react";
 
-const products: ProductCardData[] = [
-  {
-    id: "1",
-    name: "Wireless Bluetooth Headphones",
-    price: 89.99,
-    originalPrice: 129.99,
-    rating: 4.5,
-    reviews: 234,
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "TechSound",
-    inStock: true,
-    discount: 31
-  },
-  {
-    id: "2", 
-    name: "Modern Office Chair",
-    price: 299.00,
-    originalPrice: 399.00,
-    rating: 4.8,
-    reviews: 156,
-    image: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400&h=400&fit=crop",
-    category: "Furniture",
-    brand: "ComfortPlus",
-    inStock: true,
-    discount: 25
-  },
-  {
-    id: "3",
-    name: "Designer Table Lamp",
-    price: 65.50,
-    rating: 4.2,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&h=400&fit=crop",
-    category: "Home & Garden",
-    brand: "LightCraft",
-    inStock: true
-  },
-  {
-    id: "4",
-    name: "Premium Coffee Maker",
-    price: 199.99,
-    originalPrice: 249.99,
-    rating: 4.7,
-    reviews: 312,
-    image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop",
-    category: "Kitchen",
-    brand: "BrewMaster",
-    inStock: false,
-    discount: 20
-  },
-  {
-    id: "5",
-    name: "Smart Fitness Watch",
-    price: 249.00,
-    originalPrice: 299.00,
-    rating: 4.6,
-    reviews: 445,
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "FitTech",
-    inStock: true,
-    discount: 17
-  },
-  {
-    id: "6",
-    name: "Minimalist Desk Organizer",
-    price: 45.99,
-    rating: 4.3,
-    reviews: 67,
-    image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=400&fit=crop",
-    category: "Office",
-    brand: "OrganizeIt",
-    inStock: true
-  }
-];
-
-const categories = ["All", "Electronics", "Furniture", "Home & Garden", "Kitchen", "Office"];
-const brands = ["All", "TechSound", "ComfortPlus", "LightCraft", "BrewMaster", "FitTech", "OrganizeIt"];
 const priceRanges = [
   { label: "All", min: 0, max: Infinity },
-  { label: "Under $50", min: 0, max: 50 },
-  { label: "$50 - $100", min: 50, max: 100 },
-  { label: "$100 - $200", min: 100, max: 200 },
-  { label: "$200+", min: 200, max: Infinity }
+  { label: "Under ₹50", min: 0, max: 50 },
+  { label: "₹50 - ₹100", min: 50, max: 100 },
+  { label: "₹100 - ₹200", min: 100, max: 200 },
+  { label: "₹200+", min: 200, max: Infinity }
 ];
 
 export default function ShopPage() {
+  const [products, setProducts] = useState<ProductCardData[]>([]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
+  const [brands, setBrands] = useState<string[]>(["All"]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedBrand, setSelectedBrand] = useState("All");
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRanges[0]);
@@ -114,7 +42,60 @@ export default function ShopPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 12;
+
+  // Fetch products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/routes/products?active=true&limit=100");
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          // Transform API products to ProductCardData format
+          const transformedProducts: ProductCardData[] = data.data.products.map((product: any) => ({
+            id: product._id,
+            name: product.name,
+            price: product.price,
+            originalPrice: product.comparePrice || undefined,
+            rating: product.rating || 4.0,
+            reviews: product.reviewCount || 0,
+            // Use mainImage first, fallback to first image in images array, then placeholder
+            image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x400?text=No+Image",
+            category: product.category?.name || "Uncategorized",
+            brand: product.vendor?.businessName || "Unknown Brand",
+            inStock: product.stock > 0,
+            discount: product.comparePrice 
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : undefined
+          }));
+
+          setProducts(transformedProducts);
+
+          // Extract unique categories and brands
+          const uniqueCategories = Array.from(
+            new Set(transformedProducts.map(p => p.category).filter(Boolean))
+          );
+          const uniqueBrands = Array.from(
+            new Set(transformedProducts.map(p => p.brand).filter(Boolean))
+          );
+
+          setCategories(["All", ...uniqueCategories]);
+          setBrands(["All", ...uniqueBrands]);
+        } else {
+          setError("Failed to load products");
+        }
+      } catch (err) {
+        console.error("Error fetching products:", err);
+        setError("Failed to load products");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   const filteredProducts = products.filter(product => {
     const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
@@ -311,13 +292,38 @@ export default function ShopPage() {
 
           {/* Main Content */}
           <main className="flex-1 min-w-0">
-            {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 p-4 bg-white rounded-lg border border-gray-200">
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600">
-                  {sortedProducts.length} products found • Showing {startIndex + 1}-{Math.min(endIndex, sortedProducts.length)} of {sortedProducts.length}
-                </span>
+            {/* Loading State */}
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="h-12 w-12 animate-spin text-rose-600 mb-4" />
+                <p className="text-gray-600">Loading products...</p>
               </div>
+            )}
+
+            {/* Error State */}
+            {error && !loading && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                <p className="text-red-800 font-medium mb-2">Error Loading Products</p>
+                <p className="text-red-600">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Products Section */}
+            {!loading && !error && (
+              <>
+                {/* Toolbar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 p-4 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-600">
+                      {sortedProducts.length} products found • Showing {startIndex + 1}-{Math.min(endIndex, sortedProducts.length)} of {sortedProducts.length}
+                    </span>
+                  </div>
               
               <div className="flex items-center gap-4">
                 {/* Sort */}
@@ -376,58 +382,60 @@ export default function ShopPage() {
               </div>
             )}
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center">
-                <nav className="flex items-center gap-2">
-                  {/* Previous button */}
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-
-                  {/* Page numbers */}
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-                    // Show first page, last page, current page, and pages around current
-                    const showPage = page === 1 || page === totalPages || 
-                                   (page >= currentPage - 1 && page <= currentPage + 1);
-                    
-                    if (!showPage) {
-                      // Show ellipsis
-                      if (page === currentPage - 2 || page === currentPage + 2) {
-                        return <span key={page} className="px-2 text-gray-400">...</span>;
-                      }
-                      return null;
-                    }
-
-                    return (
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-8 flex items-center justify-center">
+                    <nav className="flex items-center gap-2">
+                      {/* Previous button */}
                       <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          currentPage === page
-                            ? "bg-rose-600 text-white"
-                            : "border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        }`}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {page}
+                        Previous
                       </button>
-                    );
-                  })}
 
-                  {/* Next button */}
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </nav>
-              </div>
+                      {/* Page numbers */}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                        // Show first page, last page, current page, and pages around current
+                        const showPage = page === 1 || page === totalPages || 
+                                       (page >= currentPage - 1 && page <= currentPage + 1);
+                        
+                        if (!showPage) {
+                          // Show ellipsis
+                          if (page === currentPage - 2 || page === currentPage + 2) {
+                            return <span key={page} className="px-2 text-gray-400">...</span>;
+                          }
+                          return null;
+                        }
+
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              currentPage === page
+                                ? "bg-rose-600 text-white"
+                                : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+
+                      {/* Next button */}
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </nav>
+                  </div>
+                )}
+              </>
             )}
           </main>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Star, Heart, ShoppingCart, Eye, GitCompare } from "lucide-react";
+import { Star, Heart, ShoppingCart, GitCompare } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import Link from "next/link";
 
@@ -50,13 +50,6 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
     setIsWishlisted(!isWishlisted);
   };
 
-  const handleQuickView = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Open quick view modal - implement later
-    console.log("Quick view:", product.id);
-  };
-
   const handleCompare = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -99,10 +92,10 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
         <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <button
             onClick={handleWishlistToggle}
-            className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors ${
+            className={`h-9 w-9 rounded-full flex items-center justify-center transition-colors shadow-md ${
               isWishlisted 
                 ? 'bg-red-500 text-white' 
-                : 'bg-white/80 text-gray-600 hover:bg-white hover:text-red-500'
+                : 'bg-white text-gray-600 hover:bg-red-500 hover:text-white'
             }`}
             title="Add to Wishlist"
           >
@@ -110,31 +103,20 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
           </button>
           
           <button
-            onClick={handleQuickView}
-            className="h-8 w-8 rounded-full bg-white/80 text-gray-600 hover:bg-white hover:text-blue-500 flex items-center justify-center transition-colors"
-            title="Quick View"
+            onClick={handleAddToCart}
+            disabled={!product.inStock}
+            className="h-9 w-9 rounded-full bg-white text-gray-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition-colors shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed disabled:hover:bg-gray-300 disabled:hover:text-gray-500"
+            title={product.inStock ? "Add to Cart" : "Out of Stock"}
           >
-            <Eye className="h-4 w-4" />
+            <ShoppingCart className="h-4 w-4" />
           </button>
           
           <button
             onClick={handleCompare}
-            className="h-8 w-8 rounded-full bg-white/80 text-gray-600 hover:bg-white hover:text-purple-500 flex items-center justify-center transition-colors"
+            className="h-9 w-9 rounded-full bg-white text-gray-600 hover:bg-purple-500 hover:text-white flex items-center justify-center transition-colors shadow-md"
             title="Add to Compare"
           >
             <GitCompare className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Quick Add to Cart - appears on hover */}
-        <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-          <button
-            onClick={handleAddToCart}
-            disabled={!product.inStock}
-            className="w-full bg-rose-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-rose-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {product.inStock ? 'Add to Cart' : 'Out of Stock'}
           </button>
         </div>
       </div>
@@ -154,9 +136,9 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
           
           {/* Price */}
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-gray-900">${product.price}</span>
+            <span className="text-lg font-bold text-gray-900">₹{product.price}</span>
             {product.originalPrice && (
-              <span className="text-sm text-gray-500 line-through">${product.originalPrice}</span>
+              <span className="text-sm text-gray-500 line-through">₹{product.originalPrice}</span>
             )}
           </div>
         </Link>

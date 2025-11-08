@@ -39,7 +39,6 @@ import InvoicePage from "../../components/vendor/InvoicePage";
 import DiscountPage from "../../components/vendor/DiscountPage";
 import CategoryPage from "../../components/vendor/CategoryPage";
 import SubCategoryPage from "../../components/vendor/SubCategoryPage";
-import SecurityPage from "../../components/vendor/SecurityPage";
 import HelpPage from "../../components/vendor/HelpPage";
 import SettingsPage from "../../components/vendor/SettingsPage";
 
@@ -83,7 +82,6 @@ export default function VendorDashboard() {
 
   const bottomItems = [
     { id: "settings", label: "Settings", icon: Settings },
-    { id: "security", label: "Security", icon: Shield },
     { id: "help", label: "Get Help", icon: HelpCircle },
   ];
 
@@ -138,8 +136,7 @@ export default function VendorDashboard() {
         return <OrderDetailPage onBack={() => setActiveTab("orders")} />;
       case "customer-detail":
         return <CustomerDetailPage onBack={() => setActiveTab("customers")} />;
-      case "security":
-        return <SecurityPage />;
+     
       case "help":
         return <HelpPage />;
       default:

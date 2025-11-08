@@ -1,23 +1,182 @@
 "use client";
-import { X, Plus, Minus, ShoppingBag, Trash2, ArrowRight, Tag } from "lucide-react";
-import { useCart } from "../contexts/CartContext";
+import { X, Plus, Minus, ShoppingBag, Trash2, ArrowRight, Tag, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 type CartSidebarProps = {
   isOpen: boolean;
   onClose: () => void;
 };
 
-export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
-  const { items, updateQuantity, removeItem } = useCart();
+interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  quantity: number;
+  image: string;
+  brand: string;
+  discount?: number;
+  variant?: {
+    color?: string;
+    size?: string;
+    material?: string;
+  };
+}
 
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+interface CartData {
+  items: CartItem[];
+  totalItems: number;
+  totalPrice: number;
+}
+
+export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
+  const [cartData, setCartData] = useState<CartData>({ items: [], totalItems: 0, totalPrice: 0 });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
+
+  // Get user ID from localStorage (temporary auth)
+  const getUserId = () => {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        const userObj = JSON.parse(user);
+        return userObj.id;
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // Fetch cart data
+  const fetchCart = async () => {
+    const userId = getUserId();
+    if (!userId) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch("/api/cart", {
+        headers: { "x-user-id": userId },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        console.log("Cart fetched from API:", data.data);
+        console.log("Cart items:", data.data.items);
+        data.data.items.forEach((item: any, index: number) => {
+          console.log(`Item ${index}:`, {
+            name: item.name,
+            variant: item.variant,
+            hasVariant: !!item.variant,
+          });
+        });
+        setCartData(data.data);
+      } else {
+        setError(data.message || "Failed to load cart");
+      }
+    } catch (err: any) {
+      console.error("Error fetching cart:", err);
+      setError("Failed to load cart");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load cart when sidebar opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchCart();
+    }
+  }, [isOpen]);
+
+  // Update item quantity
+  const updateQuantity = async (productId: string, newQuantity: number, variant?: any) => {
+    if (newQuantity < 1) return;
+
+    const userId = getUserId();
+    if (!userId) return;
+
+    console.log("=== UPDATE QUANTITY DEBUG ===");
+    console.log("ProductId:", productId);
+    console.log("New Quantity:", newQuantity);
+    console.log("Variant:", variant);
+    console.log("User ID:", userId);
+
+    try {
+      const requestBody = { 
+        productId, 
+        quantity: newQuantity,
+        variant: variant || undefined,
+      };
+      
+      console.log("Request body:", requestBody);
+      console.log("Fetching: PATCH /api/cart");
+      
+      const response = await fetch("/api/cart", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+      
+      const data = await response.json();
+      console.log("Response data:", data);
+      
+      if (data.success) {
+        setCartData(data.data);
+      } else {
+        console.error("Failed to update quantity:", data.message);
+      }
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+    }
+  };
+
+  // Remove item from cart
+  const removeItem = async (productId: string, variant?: any) => {
+    const userId = getUserId();
+    if (!userId) return;
+
+    try {
+      const response = await fetch("/api/cart", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({ 
+          productId,
+          variant: variant || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setCartData(data.data);
+      } else {
+        console.error("Failed to remove item:", data.message);
+      }
+    } catch (error) {
+      console.error("Error removing item:", error);
+    }
+  };
+
+  const { items, totalItems, totalPrice } = cartData;
+
+  const subtotal = totalPrice;
   const savings = items.reduce((sum, item) => {
     if (item.originalPrice) {
       return sum + ((item.originalPrice - item.price) * item.quantity);
     }
     return sum;
   }, 0);
-  const shipping = subtotal > 100 ? 0 : 9.99;
+  const shipping = subtotal > 1000 ? 0 : 99; // ₹99 for orders under ₹1000
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
 
@@ -55,7 +214,13 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
           </button>
         </div>
 
-        {items.length === 0 ? (
+        {loading ? (
+          /* Loading State */
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-rose-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading your cart...</p>
+          </div>
+        ) : items.length === 0 ? (
           /* Empty Cart */
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
@@ -73,20 +238,14 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
           </div>
         ) : (
           <div className="flex flex-col h-full">
-            {/* Free Shipping Banner */}
-            {subtotal < 100 && (
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white p-3 text-center text-sm">
-                <span className="font-semibold">
-                  Add ${(100 - subtotal).toFixed(2)} more for FREE shipping! 🚚
-                </span>
-              </div>
-            )}
+           
+           
 
             {/* Items List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {items.map((item, index) => (
                 <div 
-                  key={item.id} 
+                  key={`${item.productId}-${index}`} 
                   className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 animate-slideIn"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
@@ -110,12 +269,25 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                       <h4 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-1">
                         {item.name}
                       </h4>
-                      <p className="text-xs text-gray-600 mb-2">{item.brand}</p>
+                      <p className="text-xs text-gray-600 mb-1">{item.brand}</p>
+                      
+                      {/* Variant Info - Display any variant attributes dynamically */}
+                      {item.variant && Object.keys(item.variant).length > 0 && (
+                        <div className="flex gap-2 mb-2 flex-wrap">
+                          {Object.entries(item.variant).map(([key, value]) => (
+                            value && (
+                              <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                {key}: {value}
+                              </span>
+                            )
+                          ))}
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="font-bold text-gray-900">${item.price}</span>
+                        <span className="font-bold text-gray-900">₹{item.price}</span>
                         {item.originalPrice && (
-                          <span className="text-xs text-gray-500 line-through">${item.originalPrice}</span>
+                          <span className="text-xs text-gray-500 line-through">₹{item.originalPrice}</span>
                         )}
                       </div>
 
@@ -123,14 +295,14 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                       <div className="flex items-center justify-between">
                         <div className="flex text-black items-center border border-gray-300 rounded-lg">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variant)}
                             className="p-1 hover:bg-gray-100 transition-colors"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
                           <span className="px-3 py-1 text-sm font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variant)}
                             className="p-1 hover:bg-gray-100 transition-colors"
                           >
                             <Plus className="h-3 w-3" />
@@ -138,7 +310,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                         </div>
                         
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeItem(item.productId, item.variant)}
                           className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -152,55 +324,44 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
 
             {/* Order Summary */}
             <div className="border-t border-gray-200 p-4 bg-gray-50">
-              {/* Promo Code */}
-              <div className="mb-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Enter promo code"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                  />
-                  <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">
-                    Apply
-                  </button>
-                </div>
-              </div>
-
               {/* Summary */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
+                  <span className="font-medium">₹{subtotal.toFixed(2)}</span>
                 </div>
                 
                 {savings > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>You saved</span>
-                    <span className="font-medium">-${savings.toFixed(2)}</span>
+                    <span className="font-medium">-₹{savings.toFixed(2)}</span>
                   </div>
                 )}
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span className={`font-medium ${shipping === 0 ? 'text-green-600' : ''}`}>
-                    {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                    {shipping === 0 ? 'FREE' : `₹${shipping.toFixed(2)}`}
                   </span>
                 </div>
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tax</span>
-                  <span className="font-medium">${tax.toFixed(2)}</span>
+                  <span className="font-medium">₹{tax.toFixed(2)}</span>
                 </div>
                 
                 <div className="border-t border-gray-300 pt-2 flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-rose-600">${total.toFixed(2)}</span>
+                  <span className="text-rose-600">₹{total.toFixed(2)}</span>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="mt-4 space-y-3">
-                <button className="w-full bg-rose-600 text-white py-3 rounded-lg font-semibold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => window.location.href = '/checkout'}
+                  className="w-full bg-rose-600 text-white py-3 rounded-lg font-semibold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2"
+                >
                   Proceed to Checkout
                   <ArrowRight className="h-4 w-4" />
                 </button>

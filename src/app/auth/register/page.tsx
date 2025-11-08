@@ -7,6 +7,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string>("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -39,6 +41,7 @@ export default function RegisterPage() {
         setProfileImage(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+      setProfileFile(file);
     }
   };
 
@@ -90,14 +93,47 @@ export default function RegisterPage() {
     
     if (!validateForm()) return;
 
+    setSubmitError("");
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      let avatar: { public_id: string; url: string } | undefined = undefined;
+      if (profileFile) {
+        const fd = new FormData();
+        fd.append("files", profileFile);
+        fd.append("folder", "avatars");
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok || !uploadData?.success) {
+          throw new Error(uploadData?.message || "Failed to upload avatar");
+        }
+        const first = Array.isArray(uploadData.data) ? uploadData.data[0] : undefined;
+        if (first?.public_id) {
+          avatar = { public_id: first.public_id, url: first.url || first.secure_url };
+        }
+      }
+
+      const createRes = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.mobile,
+          avatar,
+        }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok || !createData?.success) {
+        throw new Error(createData?.message || "Registration failed");
+      }
+      // Optionally auto-login using auth endpoint
+      window.location.href = "/auth/login";
+    } catch (err: any) {
+      setSubmitError(err.message || "Registration failed");
+    } finally {
       setIsLoading(false);
-      // Handle successful registration here
-      console.log("Registration successful", { ...formData, profileImage });
-    }, 2000);
+    }
   };
 
   return (
@@ -124,6 +160,11 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {submitError && (
+              <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
+                {submitError}
+              </div>
+            )}
             {/* Profile Image Upload */}
             <div className="flex justify-center">
               <div className="relative">

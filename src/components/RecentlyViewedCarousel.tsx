@@ -1,92 +1,63 @@
 "use client";
-import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, Eye, Heart } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Eye, Heart, Loader2 } from "lucide-react";
 import { ProductCardData } from "./ProductCard";
 import Link from "next/link";
 
-const recentlyViewedProducts: ProductCardData[] = [
-  {
-    id: "rv1",
-    name: "Premium Wireless Earbuds",
-    price: 129.99,
-    originalPrice: 179.99,
-    rating: 4.8,
-    reviews: 456,
-    image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&h=400&fit=crop",
-    brand: "AudioMax",
-    category: "Electronics",
-    inStock: true,
-    discount: 28
-  },
-  {
-    id: "rv2",
-    name: "Smart Fitness Tracker",
-    price: 89.99,
-    originalPrice: 119.99,
-    rating: 4.6,
-    reviews: 234,
-    image: "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=400&h=400&fit=crop",
-    brand: "FitTech",
-    category: "Electronics",
-    inStock: true,
-    discount: 25
-  },
-  {
-    id: "rv3",
-    name: "Minimalist Desk Lamp",
-    price: 45.99,
-    rating: 4.4,
-    reviews: 167,
-    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&h=400&fit=crop",
-    brand: "LightCraft",
-    category: "Home & Garden",
-    inStock: true
-  },
-  {
-    id: "rv4",
-    name: "Ergonomic Mouse Pad",
-    price: 24.99,
-    originalPrice: 34.99,
-    rating: 4.3,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop",
-    brand: "ComfortDesk",
-    category: "Accessories",
-    inStock: true,
-    discount: 29
-  },
-  {
-    id: "rv5",
-    name: "Portable Bluetooth Speaker",
-    price: 79.99,
-    originalPrice: 99.99,
-    rating: 4.7,
-    reviews: 312,
-    image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop",
-    brand: "SoundWave",
-    category: "Electronics",
-    inStock: true,
-    discount: 20
-  }
-];
-
 export default function RecentlyViewedCarousel() {
+  const [products, setProducts] = useState<ProductCardData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
-  const [itemsPerView, setItemsPerView] = useState(4);
+  const [itemsPerView, setItemsPerView] = useState(5);
 
-  // Update items per view based on screen size
-  React.useEffect(() => {
-    const updateItemsPerView = () => {
-      if (window.innerWidth < 640) {
-        setItemsPerView(2); // Mobile: 2 items
-      } else if (window.innerWidth < 1024) {
-        setItemsPerView(3); // Tablet: 3 items
-      } else {
-        setItemsPerView(4); // Desktop: 4 items
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('/api/routes/products?active=true&limit=15');
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          const transformed: ProductCardData[] = data.data.products.map((product: any) => ({
+            id: product._id,
+            name: product.name,
+            price: product.price,
+            originalPrice: product.comparePrice,
+            rating: product.rating || 4.0,
+            reviews: product.reviewCount || 0,
+            image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400",
+            category: product.category?.name || "Products",
+            brand: product.vendor?.businessName || "Store",
+            inStock: product.stock > 0,
+            discount: product.comparePrice
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : undefined,
+          }));
+
+          setProducts(transformed.sort(() => 0.5 - Math.random()).slice(0, 10));
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
+    fetchProducts();
+  }, []);
+
+  const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
+
+  // Update items per view based on screen size
+  useEffect(() => {
+    const updateItemsPerView = () => {
+      if (window.innerWidth < 640) {
+        setItemsPerView(2);
+      } else if (window.innerWidth < 1024) {
+        setItemsPerView(3);
+      } else {
+        setItemsPerView(4);
+      }
+    };
     updateItemsPerView();
     window.addEventListener('resize', updateItemsPerView);
     return () => window.removeEventListener('resize', updateItemsPerView);
@@ -94,13 +65,13 @@ export default function RecentlyViewedCarousel() {
 
   const nextSlide = () => {
     setCurrentIndex((prev) => 
-      prev + itemsPerView >= recentlyViewedProducts.length ? 0 : prev + 1
+      prev + itemsPerView >= products.length ? 0 : prev + 1
     );
   };
 
   const prevSlide = () => {
     setCurrentIndex((prev) => 
-      prev === 0 ? Math.max(0, recentlyViewedProducts.length - itemsPerView) : prev - 1
+      prev === 0 ? Math.max(0, products.length - itemsPerView) : prev - 1
     );
   };
 
@@ -115,6 +86,19 @@ export default function RecentlyViewedCarousel() {
       return newSet;
     });
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Recently Viewed</h3>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-rose-600" />
+        </div>
+      </div>
+    );
+  }
+
+  if (products.length === 0) return null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
@@ -144,7 +128,7 @@ export default function RecentlyViewedCarousel() {
           className="flex transition-transform duration-300 ease-in-out"
           style={{ transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)` }}
         >
-          {recentlyViewedProducts.map((product) => (
+          {products.map((product: ProductCardData) => (
             <div key={product.id} className="flex-shrink-0 w-1/2 sm:w-1/3 lg:w-1/4 px-1 sm:px-2">
               <div className="group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300">
                 <Link href={`/product/${product.id}`}>
@@ -183,10 +167,10 @@ export default function RecentlyViewedCarousel() {
                     <p className="text-xs text-gray-600 mb-1 sm:mb-2">{product.brand}</p>
                     
                     <div className="flex items-center gap-1">
-                      <span className="font-bold text-rose-600">${product.price}</span>
+                      <span className="font-bold text-rose-600">₹{product.price}</span>
                       {product.originalPrice && (
                         <span className="text-xs text-gray-400 line-through">
-                          ${product.originalPrice}
+                          ₹{product.originalPrice}
                         </span>
                       )}
                     </div>
@@ -200,3 +184,4 @@ export default function RecentlyViewedCarousel() {
     </div>
   );
 }
+

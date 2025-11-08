@@ -1,10 +1,58 @@
 "use client";
-import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Plus, Loader2 } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import { ProductCardData } from "./ProductCard";
+import Link from "next/link";
 
-const quickAddProducts: ProductCardData[] = [
+export default function QuickAddCarousel() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const { addItem } = useCart();
+  const [itemsPerView, setItemsPerView] = useState(4);
+  const [products, setProducts] = useState<ProductCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch random products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/routes/products?active=true&limit=12');
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          // Transform and randomize products
+          const transformedProducts: ProductCardData[] = data.data.products.map((product: any) => ({
+            id: product._id,
+            name: product.name,
+            price: product.price,
+            originalPrice: product.comparePrice || undefined,
+            rating: product.rating || 4.0,
+            reviews: product.reviewCount || 0,
+            image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x400?text=No+Image",
+            category: product.category?.name || "Products",
+            brand: product.vendor?.businessName || "Store",
+            inStock: product.stock > 0,
+            discount: product.comparePrice
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : undefined,
+          }));
+
+          // Shuffle array for random display
+          const shuffled = transformedProducts.sort(() => 0.5 - Math.random());
+          setProducts(shuffled.slice(0, 8)); // Take first 8 random products
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+const oldQuickAddProducts: ProductCardData[] = [
   {
     id: "qa1",
     name: "Wireless Mouse",
@@ -68,11 +116,6 @@ const quickAddProducts: ProductCardData[] = [
   }
 ];
 
-export default function QuickAddCarousel() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const { addItem } = useCart();
-  const [itemsPerView, setItemsPerView] = useState(4);
-
   // Update items per view based on screen size
   React.useEffect(() => {
     const updateItemsPerView = () => {
@@ -92,15 +135,30 @@ export default function QuickAddCarousel() {
 
   const nextSlide = () => {
     setCurrentIndex((prev) => 
-      prev + itemsPerView >= quickAddProducts.length ? 0 : prev + 1
+      prev + itemsPerView >= products.length ? 0 : prev + 1
     );
   };
 
   const prevSlide = () => {
     setCurrentIndex((prev) => 
-      prev === 0 ? Math.max(0, quickAddProducts.length - itemsPerView) : prev - 1
+      prev === 0 ? Math.max(0, products.length - itemsPerView) : prev - 1
     );
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Quick Add Items</h3>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-rose-600" />
+        </div>
+      </div>
+    );
+  }
+
+  if (products.length === 0) {
+    return null;
+  }
 
   const handleQuickAdd = (product: ProductCardData) => {
     addItem({
@@ -140,8 +198,8 @@ export default function QuickAddCarousel() {
           className="flex transition-transform duration-300 ease-in-out"
           style={{ transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)` }}
         >
-          {quickAddProducts.map((product) => (
-            <div key={product.id} className="flex-shrink-0 w-1/2 sm:w-1/3 lg:w-1/4 px-1 sm:px-2">
+          {products.map((product) => (
+            <Link href={`/product/${product.id}`} key={product.id} className="flex-shrink-0 w-1/2 sm:w-1/3 lg:w-1/4 px-1 sm:px-2">
               <div className="group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300">
                 <div className="aspect-square overflow-hidden">
                   <img
@@ -165,10 +223,10 @@ export default function QuickAddCarousel() {
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
-                      <span className="font-bold text-rose-600">${product.price}</span>
+                      <span className="font-bold text-rose-600">₹{product.price}</span>
                       {product.originalPrice && (
                         <span className="text-xs text-gray-400 line-through">
-                          ${product.originalPrice}
+                          ₹{product.originalPrice}
                         </span>
                       )}
                     </div>
@@ -183,7 +241,7 @@ export default function QuickAddCarousel() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

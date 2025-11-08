@@ -11,6 +11,11 @@ export interface IVendor extends Document {
   email: string;
   phone: string;
   password: string;
+  avatar?: {
+    public_id: string;
+    url: string;
+  };
+  bio?: string;
 
   // Business Information
   businessName: string;
@@ -89,6 +94,14 @@ const VendorSchema: Schema<IVendor> = new Schema(
       required: [true, "Please add a password"],
       minlength: 6,
       select: false,
+    },
+    avatar: {
+      public_id: String,
+      url: String,
+    },
+    bio: {
+      type: String,
+      maxlength: [500, "Bio can not be more than 500 characters"],
     },
 
     // Business Information

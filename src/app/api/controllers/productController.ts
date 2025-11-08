@@ -203,7 +203,11 @@ export const getProduct = async (req: NextRequest, id: string) => {
     const product = await Product.findById(id)
       .populate({ path: "category", select: "name slug", model: Category })
       .populate({ path: "subcategory", select: "name slug", model: SubCategory })
-      .populate({ path: "vendor", select: "businessName email", model: Vendor });
+      .populate({ 
+        path: "vendor", 
+        select: "-password", // Exclude only password, include all other fields
+        model: Vendor 
+      });
 
     if (!product) {
       return NextResponse.json(

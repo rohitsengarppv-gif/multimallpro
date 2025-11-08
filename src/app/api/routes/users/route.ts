@@ -1,3 +1,3 @@
-import { getUsers } from "@/app/api/controllers/userController";
+import { listUsers } from "@/app/api/controllers/userController";
 
-export const GET = getUsers;
+export const GET = listUsers;
