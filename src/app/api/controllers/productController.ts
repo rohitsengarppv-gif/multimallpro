@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Product from "@/app/api/models/Product";
 import Category from "@/app/api/models/Category";
+import SubCategory from "@/app/api/models/SubCategory";
 import Vendor from "@/app/api/models/Vendor";
 import connectDB from "@/app/api/config/mongoose";
 
@@ -200,9 +201,9 @@ export const getProduct = async (req: NextRequest, id: string) => {
     await connectDB();
 
     const product = await Product.findById(id)
-      .populate("category", "name slug")
-      .populate("subcategory", "name slug")
-      .populate("vendor", "businessName email");
+      .populate({ path: "category", select: "name slug", model: Category })
+      .populate({ path: "subcategory", select: "name slug", model: SubCategory })
+      .populate({ path: "vendor", select: "businessName email", model: Vendor });
 
     if (!product) {
       return NextResponse.json(
