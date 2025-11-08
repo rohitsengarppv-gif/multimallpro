@@ -39,9 +39,10 @@ interface ProductsPageProps {
   onNavigateToAddProduct?: () => void;
   onNavigateToEditProduct?: (productId: string) => void;
   onNavigateToViewProduct?: (productId: string) => void;
+  onDeleteProduct?: (productId: string) => void;
 }
 
-export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditProduct, onNavigateToViewProduct }: ProductsPageProps) {
+export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditProduct, onNavigateToViewProduct, onDeleteProduct }: ProductsPageProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +102,12 @@ export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditP
 
   const handleDelete = async (productId: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
+
+    // If onDeleteProduct callback is provided, use it (for admin dashboard)
+    if (onDeleteProduct) {
+      onDeleteProduct(productId);
+      return;
+    }
 
     try {
       setActionLoading(productId);
