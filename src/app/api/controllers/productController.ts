@@ -14,10 +14,19 @@ export const getProducts = async (req: NextRequest) => {
     const search = searchParams.get("search");
     const sort = searchParams.get("sort") || "-createdAt";
     const featured = searchParams.get("featured") === "true";
-    const active = searchParams.get("active") !== "false";
+    const active = searchParams.get("active");
 
     // Build query
-    let query: any = { isActive: active };
+    let query: any = {};
+    
+    // Only filter by isActive if explicitly set to true or false
+    if (active === "true") {
+      query.isActive = true;
+    } else if (active !== "false") {
+      // Default behavior: show only active products for public
+      query.isActive = true;
+    }
+    // If active === "false", don't filter by isActive (show all)
 
     if (category) {
       query.category = category;

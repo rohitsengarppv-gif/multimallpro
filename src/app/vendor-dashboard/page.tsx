@@ -97,17 +97,13 @@ export default function VendorDashboard() {
             setSelectedProductId(null);
             setActiveTab("product-form");
           }} 
-          onNavigateToEditProduct={(productId) => {
+          onNavigateToEditProduct={(productId: string) => {
             setSelectedProductId(productId);
             setActiveTab("product-form");
           }}
-          onNavigateToViewProduct={(productId) => {
+          onNavigateToViewProduct={(productId: string) => {
             setSelectedProductId(productId);
             setActiveTab("product-form");
-          }}
-          onDeleteProduct={(productId) => {
-            // Optionally log or sync deletion
-            console.log("Deleted product:", productId);
           }}
         />;
       case "orders":

@@ -39,10 +39,9 @@ interface ProductsPageProps {
   onNavigateToAddProduct?: () => void;
   onNavigateToEditProduct?: (productId: string) => void;
   onNavigateToViewProduct?: (productId: string) => void;
-  onDeleteProduct?: (productId: string) => void;
 }
 
-export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditProduct, onNavigateToViewProduct, onDeleteProduct }: ProductsPageProps) {
+export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditProduct, onNavigateToViewProduct }: ProductsPageProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,14 +63,17 @@ export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditP
         page: page.toString(),
         limit: '20',
         vendor: vendorData._id || '',
+        active: 'false', // Show all products (active and inactive)
       });
 
       if (search) {
         params.append('search', search);
       }
 
+      console.log('Fetching products for vendor:', vendorData._id);
       const response = await fetch(`/api/routes/products?${params}`);
       const data = await response.json();
+      console.log('Products response:', data);
 
       if (data.success) {
         setProducts(data.data.products);
@@ -89,8 +91,10 @@ export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditP
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (vendorData._id) {
+      fetchProducts();
+    }
+  }, [vendorData._id]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -102,12 +106,6 @@ export default function ProductsPage({ onNavigateToAddProduct, onNavigateToEditP
 
   const handleDelete = async (productId: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
-
-    // If onDeleteProduct callback is provided, use it (for admin dashboard)
-    if (onDeleteProduct) {
-      onDeleteProduct(productId);
-      return;
-    }
 
     try {
       setActionLoading(productId);

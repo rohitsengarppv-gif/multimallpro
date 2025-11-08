@@ -88,16 +88,13 @@ export default function AdminDashboard() {
               setSelectedProductId(null);
               setActiveTab("product-form");
             }}
-            onNavigateToEditProduct={(productId) => {
+            onNavigateToEditProduct={(productId: string) => {
               setSelectedProductId(productId);
               setActiveTab("product-form");
             }}
-            onNavigateToViewProduct={(productId) => {
+            onNavigateToViewProduct={(productId: string) => {
               setSelectedProductId(productId);
               setActiveTab("product-form");
-            }}
-            onDeleteProduct={(productId) => {
-              console.log("Admin removed product", productId);
             }}
           />
         );
