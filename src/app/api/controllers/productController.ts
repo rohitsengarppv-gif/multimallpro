@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Product from "@/app/api/models/Product";
+import Category from "@/app/api/models/Category";
+import Vendor from "@/app/api/models/Vendor";
 import connectDB from "@/app/api/config/mongoose";
 
 export const getProducts = async (req: NextRequest) => {
@@ -52,8 +54,8 @@ export const getProducts = async (req: NextRequest) => {
     const skip = (page - 1) * limit;
 
     const products = await Product.find(query)
-      .populate("category", "name slug")
-      .populate("vendor", "name")
+      .populate({ path: "category", select: "name slug", model: Category })
+      .populate({ path: "vendor", select: "businessName", model: Vendor })
       .sort(sort)
       .skip(skip)
       .limit(limit)
