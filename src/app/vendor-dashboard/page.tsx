@@ -21,7 +21,10 @@ import {
   Mail,
   Filter,
   Plus,
-  List
+  List,
+  LogOut,
+  ChevronDown,
+  User
 } from "lucide-react";
 
 // Import page components
@@ -48,13 +51,27 @@ export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("products");
   const [viewMode, setViewMode] = useState("list");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [vendorData, setVendorData] = useState<any>(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
 
   // Authentication check
   useEffect(() => {
     const vendorToken = localStorage.getItem("vendorToken");
-    const vendorData = localStorage.getItem("vendorData");
+    const vendorDataString = localStorage.getItem("vendorData");
 
-    if (!vendorToken || !vendorData) {
+    if (!vendorToken || !vendorDataString) {
+      router.push("/vendor-login");
+      return;
+    }
+
+    try {
+      const parsedVendorData = JSON.parse(vendorDataString);
+      setVendorData(parsedVendorData);
+    } catch (error) {
+      console.error('Error parsing vendor data:', error);
       router.push("/vendor-login");
       return;
     }
@@ -63,11 +80,87 @@ export default function VendorDashboard() {
     // For now, we trust the localStorage data
   }, [router]);
 
+  const handleLogout = () => {
+    localStorage.removeItem("vendorToken");
+    localStorage.removeItem("vendorData");
+    router.push("/vendor-login");
+  };
+
+  // Fetch new orders count
+  const fetchNewOrdersCount = async () => {
+    try {
+      const vendorToken = localStorage.getItem("vendorToken");
+      const vendorDataString = localStorage.getItem("vendorData");
+
+      if (!vendorToken || !vendorDataString) return;
+
+      const vendor = JSON.parse(vendorDataString);
+      const vendorId = vendor._id;
+
+      // Fetch orders that might be new (pending, confirmed, processing)
+      const response = await fetch(`/api/routes/orders?vendor=${vendorId}&limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${vendorToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const orders = data.data.orders;
+
+          // Count orders that are considered "new" for the vendor
+          const newOrders = orders.filter((order: any) => {
+            const status = order.status?.toLowerCase();
+            return status === 'pending' || status === 'confirmed' || status === 'processing';
+          });
+
+          setNewOrdersCount(newOrders.length);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching new orders count:', error);
+      // Keep existing count on error to avoid flickering
+    }
+  };
+
+  // Clear new orders badge when orders tab is clicked
+  const handleOrdersTabClick = () => {
+    setActiveTab("orders");
+    setNewOrdersCount(0);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.profile-dropdown')) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileDropdownOpen]);
+
+  // Fetch orders count on mount and periodically
+  useEffect(() => {
+    if (vendorData) {
+      fetchNewOrdersCount();
+      const interval = setInterval(fetchNewOrdersCount, 30000); // Update every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [vendorData]);
+
   const sidebarItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "orders", label: "Order", icon: ShoppingCart, badge: "16" },
+    { id: "orders", label: "Order", icon: ShoppingCart, badge: newOrdersCount > 0 ? newOrdersCount.toString() : null },
     { id: "customers", label: "Customers", icon: Users },
-    { id: "messages", label: "Message", icon: MessageSquare },
   ];
 
   const toolsItems = [
@@ -77,7 +170,6 @@ export default function VendorDashboard() {
     { id: "discount", label: "Discount", icon: Percent },
     { id: "integrations", label: "Integrations", icon: Grid3X3 },
     { id: "analytics", label: "Analytic", icon: BarChart3 },
-    { id: "invoice", label: "Invoice", icon: CreditCard },
   ];
 
   const bottomItems = [
@@ -105,11 +197,31 @@ export default function VendorDashboard() {
           }}
         />;
       case "orders":
-        return <OrdersPage />;
+        return <OrdersPage 
+          onNavigateToOrderDetail={(orderId: string) => {
+            setSelectedOrderId(orderId);
+            setActiveTab("order-detail");
+          }}
+        />;
+      case "order-detail":
+        return selectedOrderId ? (
+          <OrderDetailPage 
+            orderId={selectedOrderId}
+            onBack={() => {
+              setSelectedOrderId(null);
+              setActiveTab("orders");
+            }}
+          />
+        ) : null;
       case "analytics":
         return <AnalyticsPage />;
       case "customers":
-        return <CustomersPage />;
+        return <CustomersPage 
+          onNavigateToCustomerDetail={(customerId: string) => {
+            setSelectedCustomerId(customerId);
+            setActiveTab("customer-detail");
+          }}
+        />;
       case "categories":
         return <CategoryPage />;
       case "sub-categories":
@@ -132,10 +244,16 @@ export default function VendorDashboard() {
             setActiveTab("products");
           }} 
         />;
-      case "order-detail":
-        return <OrderDetailPage onBack={() => setActiveTab("orders")} />;
       case "customer-detail":
-        return <CustomerDetailPage onBack={() => setActiveTab("customers")} />;
+        return selectedCustomerId ? (
+          <CustomerDetailPage 
+            customerId={selectedCustomerId}
+            onBack={() => {
+              setSelectedCustomerId(null);
+              setActiveTab("customers");
+            }}
+          />
+        ) : null;
      
       case "help":
         return <HelpPage />;
@@ -175,7 +293,13 @@ export default function VendorDashboard() {
                 return (
                   <li key={item.id}>
                     <button
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => {
+                        if (item.id === "orders") {
+                          handleOrdersTabClick();
+                        } else {
+                          setActiveTab(item.id);
+                        }
+                      }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors text-sm ${
                         activeTab === item.id
                           ? 'bg-orange-50 text-orange-600'
@@ -186,8 +310,8 @@ export default function VendorDashboard() {
                         <IconComponent className="h-4 w-4" />
                         {item.label}
                       </div>
-                      {item.badge && (
-                        <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                      {item.badge && item.badge !== "0" && (
+                        <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium min-w-[20px] text-center animate-pulse">
                           {item.badge}
                         </span>
                       )}
@@ -275,25 +399,67 @@ export default function VendorDashboard() {
             </div>
             
             <div className="flex items-center gap-4">
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-                <Mail className="h-5 w-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
-                  5
-                </span>
-              </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
-              </button>
+              
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full bg-orange-500 grid place-items-center text-white text-sm font-bold">
-                  JS
+                  {vendorData ? (vendorData.businessName || vendorData.name || 'V').charAt(0).toUpperCase() : 'V'}
                 </div>
                 <div className="hidden md:block">
-                  <div className="text-sm font-medium text-gray-900">Jimmy Sullivan</div>
-                  <div className="text-xs text-gray-500">Odema Store</div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {vendorData ? (vendorData.name || 'Vendor') : 'Vendor'}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {vendorData ? (vendorData.businessName || 'Business') : 'Business'}
+                  </div>
+                </div>
+                <div className="relative profile-dropdown">
+                  <button
+                    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {profileDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="p-4 border-b border-gray-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-orange-500 grid place-items-center text-white font-bold">
+                            {vendorData ? (vendorData.businessName || vendorData.name || 'V').charAt(0).toUpperCase() : 'V'}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {vendorData ? (vendorData.name || 'Vendor') : 'Vendor'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {vendorData ? (vendorData.businessName || 'Business') : 'Business'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            setActiveTab('settings');
+                            setProfileDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <User className="h-4 w-4" />
+                          Profile Settings
+                        </button>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, ChevronRight, ShoppingBag, MapPin, CreditCard, Package, Tag, X, Copy, CheckCircle } from "lucide-react";
+import { Check, ChevronRight, ShoppingBag, MapPin, CreditCard, Package, Tag, X, Copy, CheckCircle, Plus } from "lucide-react";
 
 interface CartItem {
   productId: string;
@@ -41,6 +41,20 @@ interface Offer {
   endDate: string;
 }
 
+interface Address {
+  _id: string;
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  addressType: "home" | "work" | "other";
+  isDefault: boolean;
+}
+
 export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [cartData, setCartData] = useState<CartData>({ items: [], totalItems: 0, totalPrice: 0 });
@@ -53,6 +67,9 @@ export default function CheckoutPage() {
   const [appliedDiscount, setAppliedDiscount] = useState<Offer | null>(null);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [couponError, setCouponError] = useState<string>("");
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
 
   // Shipping Information
   const [shippingInfo, setShippingInfo] = useState({
@@ -79,12 +96,12 @@ export default function CheckoutPage() {
     { number: 1, title: "Cart Review", icon: ShoppingBag },
     { number: 2, title: "Shipping", icon: MapPin },
     { number: 3, title: "Payment", icon: CreditCard },
-    { number: 4, title: "Confirmation", icon: Package },
   ];
 
   useEffect(() => {
     fetchCart();
     fetchUserProfile();
+    fetchAddresses();
   }, []);
 
   const fetchCart = async () => {
@@ -139,8 +156,35 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleNextStep = () => {
-    if (currentStep < 4) {
+  const fetchAddresses = async () => {
+    const userData = localStorage.getItem("user");
+    if (!userData) return;
+
+    try {
+      const user = JSON.parse(userData);
+      const response = await fetch("/api/addresses", {
+        headers: { "x-user-id": user.id },
+      });
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        setAddresses(data.data);
+        // Auto-select default address
+        const defaultAddr = data.data.find((addr: Address) => addr.isDefault);
+        if (defaultAddr) {
+          setSelectedAddress(defaultAddr);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching addresses:", error);
+    }
+  };
+
+  const handleNextStep = async () => {
+    // If on payment step, place the order
+    if (currentStep === 3) {
+      await handlePlaceOrder();
+    } else if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -148,6 +192,84 @@ export default function CheckoutPage() {
   const handlePreviousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handlePlaceOrder = async () => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    if (!selectedAddress) {
+      alert("Please select a delivery address");
+      setCurrentStep(2);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const user = JSON.parse(userData);
+
+      // Prepare order items with full product details
+      const orderItems = cartData.items.map((item) => ({
+        product: item.productId,
+        productName: item.name,
+        productImage: item.image,
+        brand: item.brand,
+        vendor: item.vendor,
+        variant: item.variant,
+        quantity: item.quantity,
+        price: item.price,
+        originalPrice: item.originalPrice,
+        discount: item.discount,
+        total: item.price * item.quantity,
+      }));
+
+      const orderData = {
+        items: orderItems,
+        subtotal: calculateSubtotal(),
+        tax: calculateTax(),
+        shipping: calculateShipping(),
+        discount: discountAmount,
+        discountCode: appliedDiscount?.code,
+        total: calculateTotal(),
+        paymentMethod: paymentMethod.toUpperCase(),
+        shippingAddress: {
+          fullName: selectedAddress.fullName,
+          phone: selectedAddress.phone,
+          addressLine1: selectedAddress.addressLine1,
+          addressLine2: selectedAddress.addressLine2,
+          city: selectedAddress.city,
+          state: selectedAddress.state,
+          zipCode: selectedAddress.zipCode,
+          country: selectedAddress.country,
+        },
+      };
+
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Redirect to thank you page with order ID
+        window.location.href = `/thank-you?orderId=${data.data._id}`;
+      } else {
+        alert(data.message || "Failed to place order");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error("Error placing order:", error);
+      alert("Failed to place order. Please try again.");
+      setLoading(false);
     }
   };
 
@@ -442,103 +564,87 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Step 2: Shipping Information */}
+              {/* Step 2: Shipping Address */}
               {currentStep === 2 && (
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-6">Shipping Information</h2>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingInfo.fullName}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, fullName: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          value={shippingInfo.email}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, email: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number *
-                      </label>
-                      <input
-                        type="tel"
-                        value={shippingInfo.phone}
-                        onChange={(e) => setShippingInfo({ ...shippingInfo, phone: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Address *
-                      </label>
-                      <textarea
-                        value={shippingInfo.address}
-                        onChange={(e) => setShippingInfo({ ...shippingInfo, address: e.target.value })}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          City *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingInfo.city}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, city: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          State *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingInfo.state}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, state: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          ZIP Code *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingInfo.zipCode}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, zipCode: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                          required
-                        />
-                      </div>
-                    </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Select Delivery Address</h2>
+                    <button
+                      onClick={() => window.location.href = '/address'}
+                      className="flex items-center justify-center gap-2 px-4 py-2 text-rose-600 border border-rose-600 rounded-lg font-semibold hover:bg-rose-50 transition-colors text-sm sm:text-base"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add New Address
+                    </button>
                   </div>
+
+                  {addresses.length === 0 ? (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                      <MapPin className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No saved addresses</h3>
+                      <p className="text-sm text-gray-600 mb-6">Add a delivery address to continue</p>
+                      <button
+                        onClick={() => window.location.href = '/address'}
+                        className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-700"
+                      >
+                        <Plus className="h-5 w-5" />
+                        Add Address
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {addresses.map((address) => (
+                        <div
+                          key={address._id}
+                          onClick={() => setSelectedAddress(address)}
+                          className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                            selectedAddress?._id === address._id
+                              ? "border-rose-500 bg-rose-50"
+                              : "border-gray-200 hover:border-rose-300"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3 sm:gap-4">
+                            <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              selectedAddress?._id === address._id
+                                ? "border-rose-600 bg-rose-600"
+                                : "border-gray-300"
+                            }`}>
+                              {selectedAddress?._id === address._id && (
+                                <Check className="h-3 w-3 text-white" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="font-semibold text-gray-900 capitalize text-sm sm:text-base">
+                                    {address.addressType}
+                                  </h3>
+                                  {address.isDefault && (
+                                    <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                                      <Check className="h-3 w-3" />
+                                      Default
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="space-y-1 text-sm sm:text-base">
+                                <p className="font-medium text-gray-900">{address.fullName}</p>
+                                <p className="text-gray-600">{address.phone}</p>
+                                <p className="text-gray-600">
+                                  {address.addressLine1}
+                                  {address.addressLine2 && `, ${address.addressLine2}`}
+                                </p>
+                                <p className="text-gray-600">
+                                  {address.city}, {address.state} - {address.zipCode}
+                                </p>
+                                <p className="text-gray-600">{address.country}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -779,61 +885,61 @@ export default function CheckoutPage() {
 
         {/* Offer Popup Modal */}
         {showOfferPopup && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Available Offers</h2>
-                  <p className="text-sm text-gray-600 mt-1">Choose from vendor-specific coupons</p>
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+                <div className="flex-1 min-w-0 pr-4">
+                  <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Available Offers</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">Choose from vendor-specific coupons</p>
                 </div>
                 <button
                   onClick={() => setShowOfferPopup(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
                 >
-                  <X className="h-6 w-6 text-gray-600" />
+                  <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="p-3 sm:p-6 overflow-y-auto flex-1">
                 {loadingOffers ? (
                   <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-600"></div>
+                    <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-rose-600"></div>
                   </div>
                 ) : offers.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Tag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No offers available</h3>
-                    <p className="text-gray-600">Check back later for new deals from your vendors</p>
+                  <div className="text-center py-8 sm:py-12">
+                    <Tag className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No offers available</h3>
+                    <p className="text-sm sm:text-base text-gray-600">Check back later for new deals from your vendors</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {offers.map((offer) => (
                       <div
                         key={offer._id}
-                        className="border border-gray-200 rounded-lg p-4 hover:border-rose-300 hover:shadow-md transition-all"
+                        className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-rose-300 hover:shadow-md transition-all"
                       >
-                        <div className="flex gap-4">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                           {/* Offer Image */}
                           {offer.image?.url && (
                             <img
                               src={offer.image.url}
                               alt={offer.name}
-                              className="w-24 h-24 object-cover rounded-lg"
+                              className="w-full sm:w-24 h-32 sm:h-24 object-cover rounded-lg flex-shrink-0"
                             />
                           )}
 
                           {/* Offer Details */}
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <h3 className="font-bold text-gray-900 text-lg">{offer.name}</h3>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-gray-900 text-base sm:text-lg">{offer.name}</h3>
                                 {offer.description && (
-                                  <p className="text-sm text-gray-600 mt-1">{offer.description}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">{offer.description}</p>
                                 )}
                               </div>
-                              <div className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-sm font-semibold">
+                              <div className="bg-rose-100 text-rose-700 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap self-start">
                                 {offer.type === "percentage"
                                   ? `${offer.value}% OFF`
                                   : offer.type === "fixed"
@@ -843,7 +949,7 @@ export default function CheckoutPage() {
                             </div>
 
                             {/* Offer Conditions */}
-                            <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-600">
+                            <div className="flex flex-wrap gap-2 sm:gap-3 mb-3 text-xs text-gray-600">
                               {offer.minOrderAmount && (
                                 <span className="flex items-center gap-1">
                                   <span className="font-medium">Min Order:</span> ₹{offer.minOrderAmount}
@@ -861,33 +967,36 @@ export default function CheckoutPage() {
                             </div>
 
                             {/* Coupon Code and Actions */}
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 flex items-center gap-2 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg px-4 py-2">
-                                <Tag className="h-4 w-4 text-gray-600" />
-                                <span className="font-mono font-bold text-gray-900">{offer.code}</span>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                              <div className="flex-1 flex items-center gap-2 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg px-3 sm:px-4 py-2 min-w-0">
+                                <Tag className="h-4 w-4 text-gray-600 flex-shrink-0" />
+                                <span className="font-mono font-bold text-gray-900 text-sm sm:text-base truncate">{offer.code}</span>
                               </div>
-                              <button
-                                onClick={() => handleCopyCode(offer.code)}
-                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center gap-2"
-                              >
-                                {copiedCode === offer.code ? (
-                                  <>
-                                    <Check className="h-4 w-4" />
-                                    Copied
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="h-4 w-4" />
-                                    Copy
-                                  </>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => handleApplyCoupon(offer)}
-                                className="px-6 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-colors"
-                              >
-                                Apply
-                              </button>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleCopyCode(offer.code)}
+                                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                                >
+                                  {copiedCode === offer.code ? (
+                                    <>
+                                      <Check className="h-4 w-4" />
+                                      <span className="hidden sm:inline">Copied</span>
+                                      <span className="sm:hidden">✓</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-4 w-4" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleApplyCoupon(offer)}
+                                  className="flex-1 sm:flex-none px-4 sm:px-6 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-colors text-sm"
+                                >
+                                  Apply
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>

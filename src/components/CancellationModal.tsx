@@ -30,13 +30,9 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, orderNum
     if (!selectedReason) return;
 
     setIsSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      onConfirm(selectedReason, details);
-      setIsSubmitting(false);
-      handleClose();
-    }, 1500);
+    await onConfirm(selectedReason, details);
+    setIsSubmitting(false);
+    handleClose();
   };
 
   const handleClose = () => {

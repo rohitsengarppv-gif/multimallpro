@@ -5,42 +5,40 @@ export interface IOrder extends Document {
   customer: mongoose.Types.ObjectId;
   items: {
     product: mongoose.Types.ObjectId;
-    variant?: string;
+    productName: string;
+    productImage: string;
+    brand: string;
+    vendor: mongoose.Types.ObjectId;
+    vendorName?: string;
+    variant?: Record<string, string>;
     quantity: number;
     price: number;
+    originalPrice?: number;
+    discount?: number;
     total: number;
   }[];
   subtotal: number;
   tax: number;
   shipping: number;
   discount: number;
+  discountCode?: string;
   total: number;
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
   paymentStatus: "pending" | "paid" | "failed" | "refunded";
   paymentMethod: string;
   shippingAddress: {
-    name: string;
-    email: string;
+    fullName: string;
     phone: string;
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  billingAddress: {
-    name: string;
-    email: string;
-    phone: string;
-    street: string;
+    addressLine1: string;
+    addressLine2?: string;
     city: string;
     state: string;
     zipCode: string;
     country: string;
   };
   trackingNumber?: string;
+  estimatedDelivery?: Date;
   notes?: string;
-  vendor: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,8 +47,12 @@ const OrderSchema: Schema<IOrder> = new Schema(
   {
     orderNumber: {
       type: String,
-      required: true,
       unique: true,
+      default: function() {
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+        return `ORD-${timestamp}-${random}`;
+      },
     },
     customer: {
       type: Schema.Types.ObjectId,
@@ -63,7 +65,25 @@ const OrderSchema: Schema<IOrder> = new Schema(
         ref: "Product",
         required: true,
       },
-      variant: String,
+      productName: {
+        type: String,
+        required: true,
+      },
+      productImage: {
+        type: String,
+        required: true,
+      },
+      brand: {
+        type: String,
+        required: true,
+      },
+      vendor: {
+        type: Schema.Types.ObjectId,
+        ref: "Vendor",
+        required: true,
+      },
+      vendorName: String,
+      variant: Schema.Types.Mixed,
       quantity: {
         type: Number,
         required: true,
@@ -74,6 +94,8 @@ const OrderSchema: Schema<IOrder> = new Schema(
         required: true,
         min: [0, "Price must be positive"],
       },
+      originalPrice: Number,
+      discount: Number,
       total: {
         type: Number,
         required: true,
@@ -100,6 +122,7 @@ const OrderSchema: Schema<IOrder> = new Schema(
       default: 0,
       min: [0, "Discount must be positive"],
     },
+    discountCode: String,
     total: {
       type: Number,
       required: true,
@@ -120,90 +143,42 @@ const OrderSchema: Schema<IOrder> = new Schema(
       required: [true, "Please add a payment method"],
     },
     shippingAddress: {
-      name: {
+      fullName: {
         type: String,
-        required: [true, "Please add shipping name"],
-      },
-      email: {
-        type: String,
-        required: [true, "Please add shipping email"],
-        match: [
-          /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-          "Please add a valid email",
-        ],
+        required: [true, "Please add full name"],
       },
       phone: {
         type: String,
-        required: [true, "Please add shipping phone"],
+        required: [true, "Please add phone number"],
       },
-      street: {
+      addressLine1: {
         type: String,
-        required: [true, "Please add shipping street"],
+        required: [true, "Please add address line 1"],
       },
+      addressLine2: String,
       city: {
         type: String,
-        required: [true, "Please add shipping city"],
+        required: [true, "Please add city"],
       },
       state: {
         type: String,
-        required: [true, "Please add shipping state"],
+        required: [true, "Please add state"],
       },
       zipCode: {
         type: String,
-        required: [true, "Please add shipping zip code"],
+        required: [true, "Please add zip code"],
       },
       country: {
         type: String,
-        required: [true, "Please add shipping country"],
-      },
-    },
-    billingAddress: {
-      name: {
-        type: String,
-        required: [true, "Please add billing name"],
-      },
-      email: {
-        type: String,
-        required: [true, "Please add billing email"],
-        match: [
-          /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-          "Please add a valid email",
-        ],
-      },
-      phone: {
-        type: String,
-        required: [true, "Please add billing phone"],
-      },
-      street: {
-        type: String,
-        required: [true, "Please add billing street"],
-      },
-      city: {
-        type: String,
-        required: [true, "Please add billing city"],
-      },
-      state: {
-        type: String,
-        required: [true, "Please add billing state"],
-      },
-      zipCode: {
-        type: String,
-        required: [true, "Please add billing zip code"],
-      },
-      country: {
-        type: String,
-        required: [true, "Please add billing country"],
+        required: [true, "Please add country"],
+        default: "India",
       },
     },
     trackingNumber: String,
+    estimatedDelivery: Date,
     notes: {
       type: String,
       maxlength: [500, "Notes can not be more than 500 characters"],
-    },
-    vendor: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Please add a vendor"],
     },
   },
   {
@@ -211,8 +186,8 @@ const OrderSchema: Schema<IOrder> = new Schema(
   }
 );
 
-// Pre-save middleware to generate order number
-OrderSchema.pre("save", function (next) {
+// Pre-validate middleware to generate order number before validation
+OrderSchema.pre("validate", function (next) {
   if (this.isNew && !this.orderNumber) {
     const timestamp = Date.now().toString().slice(-6);
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
@@ -224,9 +199,9 @@ OrderSchema.pre("save", function (next) {
 // Create indexes
 OrderSchema.index({ orderNumber: 1 });
 OrderSchema.index({ customer: 1 });
-OrderSchema.index({ vendor: 1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ paymentStatus: 1 });
 OrderSchema.index({ createdAt: -1 });
+OrderSchema.index({ "items.vendor": 1 });
 
 export default mongoose.models.Order || mongoose.model<IOrder>("Order", OrderSchema);

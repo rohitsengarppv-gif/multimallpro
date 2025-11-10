@@ -18,10 +18,15 @@ export const getCart = async (req: NextRequest) => {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const cart = await Cart.findOne({ user: userId }).populate({
-      path: "items.productId",
-      select: "name price stock isActive",
-    });
+    const cart = await Cart.findOne({ user: userId })
+      .populate({
+        path: "items.productId",
+        select: "name price stock isActive",
+      })
+      .populate({
+        path: "items.vendor",
+        select: "businessName email",
+      });
 
     if (!cart) {
       // Return empty cart structure
