@@ -7,14 +7,11 @@ import {
   User, 
   Building, 
   FileText, 
-  CreditCard, 
   CheckCircle, 
   ArrowRight, 
   ArrowLeft,
   Upload,
   Mail,
-  Phone,
-  MapPin,
   Globe,
   Package,
   DollarSign,
@@ -417,129 +414,6 @@ export default function BecomeVendorPage() {
       alert("An error occurred during registration. Please try again.");
     }
   };
-
-  // Login Form Component
-  const LoginForm = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <div className="bg-rose-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <User className="h-10 w-10 text-rose-600" />
-        </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Vendor Login</h3>
-        <p className="text-gray-600">Access your vendor dashboard</p>
-      </div>
-
-      <form onSubmit={handleLoginSubmit} className="space-y-6">
-        {/* Email Field */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Email Address
-          </label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="email"
-              name="email"
-              value={loginData.email}
-              onChange={handleLoginInputChange}
-              required
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-              placeholder="your@email.com"
-              disabled={loginLoading}
-            />
-          </div>
-        </div>
-
-        {/* Password Field */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Password
-          </label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={loginData.password}
-              onChange={handleLoginInputChange}
-              required
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-              placeholder="Enter your password"
-              disabled={loginLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              disabled={loginLoading}
-            >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Error Message */}
-        {loginError && (
-          <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">{loginError}</span>
-          </div>
-        )}
-
-        {/* Success Message */}
-        {loginSuccess && (
-          <div className="flex items-center gap-2 text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
-            <CheckCircle className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">{loginSuccess}</span>
-          </div>
-        )}
-
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={loginLoading}
-          className="w-full bg-rose-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-rose-700 focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-        >
-          {loginLoading ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Signing In...
-            </>
-          ) : (
-            <>
-              Sign In to Dashboard
-              <ArrowRight className="h-5 w-5" />
-            </>
-          )}
-        </button>
-      </form>
-
-      {/* Links */}
-      <div className="text-center space-y-2 pt-4 border-t border-gray-200">
-        <p className="text-sm text-gray-600">
-          Don't have an account?{" "}
-          <button
-            onClick={() => setActiveTab("register")}
-            className="text-rose-600 hover:text-rose-700 font-semibold"
-          >
-            Become a Vendor
-          </button>
-        </p>
-        <p className="text-sm text-gray-600">
-          <a
-            href="/forgot-password"
-            className="text-rose-600 hover:text-rose-700"
-          >
-            Forgot your password?
-          </a>
-        </p>
-      </div>
-    </div>
-  );
 
   // Upload Modal Component
   const UploadModal = () => (
@@ -1297,7 +1171,125 @@ export default function BecomeVendorPage() {
             </>
           ) : (
             /* Login Form */
-            <LoginForm />
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <div className="bg-rose-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <User className="h-10 w-10 text-rose-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Vendor Login</h3>
+                <p className="text-gray-600">Access your vendor dashboard</p>
+              </div>
+
+              <form onSubmit={handleLoginSubmit} className="space-y-6">
+                {/* Email Field */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="email"
+                      name="email"
+                      value={loginData.email}
+                      onChange={handleLoginInputChange}
+                      required
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                      placeholder="your@email.com"
+                      disabled={loginLoading}
+                    />
+                  </div>
+                </div>
+
+                {/* Password Field */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={loginData.password}
+                      onChange={handleLoginInputChange}
+                      required
+                      className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                      placeholder="Enter your password"
+                      disabled={loginLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      disabled={loginLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {loginError && (
+                  <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                    <span className="text-sm">{loginError}</span>
+                  </div>
+                )}
+
+                {/* Success Message */}
+                {loginSuccess && (
+                  <div className="flex items-center gap-2 text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                    <span className="text-sm">{loginSuccess}</span>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loginLoading}
+                  className="w-full bg-rose-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-rose-700 focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {loginLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Signing In...
+                    </>
+                  ) : (
+                    <>
+                      Sign In to Dashboard
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Links */}
+              <div className="text-center space-y-2 pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{" "}
+                  <button
+                    onClick={() => setActiveTab("register")}
+                    className="text-rose-600 hover:text-rose-700 font-semibold"
+                  >
+                    Become a Vendor
+                  </button>
+                </p>
+                <p className="text-sm text-gray-600">
+                  <a
+                    href="/forgot-password"
+                    className="text-rose-600 hover:text-rose-700"
+                  >
+                    Forgot your password?
+                  </a>
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
