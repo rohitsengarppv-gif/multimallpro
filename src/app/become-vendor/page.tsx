@@ -798,21 +798,25 @@ export default function BecomeVendorPage() {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Average Order Value
+                  Average Order Value (₹)
                 </label>
-                <select
+                <input
+                  type="text"
                   name="averageOrderValue"
                   value={formData.averageOrderValue}
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                >
-                  <option value="">Select range</option>
-                  <option value="under-50">Under $50</option>
-                  <option value="50-100">$50 - $100</option>
-                  <option value="100-250">$100 - $250</option>
-                  <option value="250-500">$250 - $500</option>
-                  <option value="over-500">Over $500</option>
-                </select>
+                  placeholder="e.g., ₹500-1000 or ₹2500"
+                  list="order-value-suggestions"
+                />
+                <datalist id="order-value-suggestions">
+                  <option value="Under ₹500" />
+                  <option value="₹500-1000" />
+                  <option value="₹1000-2500" />
+                  <option value="₹2500-5000" />
+                  <option value="Over ₹5000" />
+                </datalist>
+                <p className="text-xs text-gray-500 mt-1">Enter amount in rupees or select from suggestions</p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -966,7 +970,7 @@ export default function BecomeVendorPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Bank Account (Last 4 digits) *
+                    Bank Account Number *
                   </label>
                   <input
                     type="text"
@@ -974,14 +978,15 @@ export default function BecomeVendorPage() {
                     value={formData.bankAccount}
                     onChange={handleInputChange}
                     required
-                    maxLength={4}
+                    maxLength={30}
+                    minLength={4}
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 ${
                       validationErrors[4] && !formData.bankAccount.trim() ? 'border-red-300 bg-red-50' : 'border-gray-300'
                     }`}
-                    placeholder="XXXX"
+                    placeholder="Enter full bank account number"
                   />
                   {validationErrors[4] && !formData.bankAccount.trim() && (
-                    <p className="text-red-500 text-xs mt-1">Bank account last 4 digits are required</p>
+                    <p className="text-red-500 text-xs mt-1">Bank account number is required</p>
                   )}
                 </div>
               </div>

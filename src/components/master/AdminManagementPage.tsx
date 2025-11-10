@@ -1,189 +1,247 @@
-import { useState } from "react";
-import { Search, ShieldCheck, UserPlus, Edit, Trash2, X, Award } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, ShieldCheck, CheckCircle, XCircle, Clock, Loader, Trash2, RefreshCw } from "lucide-react";
 
-type AdminRole = "super" | "security" | "operations" | "support";
+type AdminRole = "admin" | "master_admin";
 
-type AdminStatus = "active" | "invited" | "disabled";
+type AdminStatus = "pending" | "approved" | "rejected";
 
 interface AdminAccount {
-  id: number;
-  name: string;
+  _id: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  phone: string;
+  department: string;
   role: AdminRole;
   status: AdminStatus;
-  lastActive: string;
+  lastLogin?: string;
   createdAt: string;
-  teams: string[];
+  updatedAt: string;
 }
 
 const roleLabels: Record<AdminRole, string> = {
-  super: "Super Admin",
-  security: "Security",
-  operations: "Operations",
-  support: "Support"
+  admin: "Admin",
+  master_admin: "Master Admin",
 };
 
 const statusClasses: Record<AdminStatus, string> = {
-  active: "bg-emerald-100 text-emerald-700",
-  invited: "bg-blue-100 text-blue-700",
-  disabled: "bg-red-100 text-red-700"
+  pending: "bg-yellow-100 text-yellow-700",
+  approved: "bg-emerald-100 text-emerald-700",
+  rejected: "bg-red-100 text-red-700",
+};
+
+const statusIcons: Record<AdminStatus, any> = {
+  pending: Clock,
+  approved: CheckCircle,
+  rejected: XCircle,
 };
 
 export default function AdminManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | AdminRole>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | AdminStatus>("all");
-  const [showModal, setShowModal] = useState(false);
-  const [editingAdmin, setEditingAdmin] = useState<AdminAccount | null>(null);
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-  const [admins, setAdmins] = useState<AdminAccount[]>([
-    {
-      id: 1,
-      name: "Alex Doe",
-      email: "alex.doe@multivendor.com",
-      role: "super",
-      status: "active",
-      lastActive: "2 minutes ago",
-      createdAt: "2020-01-15",
-      teams: ["Leadership", "Operations"]
-    },
-    {
-      id: 2,
-      name: "Bianca Rivers",
-      email: "bianca.rivers@multivendor.com",
-      role: "operations",
-      status: "active",
-      lastActive: "18 minutes ago",
-      createdAt: "2021-03-22",
-      teams: ["Vendor Ops", "Growth"]
-    },
-    {
-      id: 3,
-      name: "Carlos Mendes",
-      email: "carlos.mendes@multivendor.com",
-      role: "security",
-      status: "invited",
-      lastActive: "—",
-      createdAt: "2024-10-02",
-      teams: ["Security"]
-    },
-    {
-      id: 4,
-      name: "Dana Kapoor",
-      email: "dana.kapoor@multivendor.com",
-      role: "support",
-      status: "disabled",
-      lastActive: "Jul 18, 2024",
-      createdAt: "2022-07-10",
-      teams: ["Support", "Experience"]
+  // Fetch admins from API
+  useEffect(() => {
+    fetchAdmins();
+  }, []);
+
+  const fetchAdmins = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/admins");
+      const data = await response.json();
+      
+      if (data.success) {
+        setAdmins(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching admins:", error);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    role: "operations" as AdminRole,
-    status: "active" as AdminStatus,
-    teams: ""
-  });
+  const handleApprove = async (adminId: string) => {
+    setIsProcessing(adminId);
+    try {
+      const response = await fetch(`/api/admins/${adminId}/approve`, {
+        method: "PUT",
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state
+        setAdmins((prev) =>
+          prev.map((admin) =>
+            admin._id === adminId ? { ...admin, status: "approved" as AdminStatus } : admin
+          )
+        );
+        alert("Admin approved successfully!");
+      } else {
+        alert(data.message || "Failed to approve admin");
+      }
+    } catch (error) {
+      console.error("Error approving admin:", error);
+      alert("Error approving admin");
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleReject = async (adminId: string) => {
+    if (!confirm("Are you sure you want to reject this admin application?")) {
+      return;
+    }
+
+    setIsProcessing(adminId);
+    try {
+      const response = await fetch(`/api/admins/${adminId}/reject`, {
+        method: "PUT",
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state
+        setAdmins((prev) =>
+          prev.map((admin) =>
+            admin._id === adminId ? { ...admin, status: "rejected" as AdminStatus } : admin
+          )
+        );
+        alert("Admin rejected successfully");
+      } else {
+        alert(data.message || "Failed to reject admin");
+      }
+    } catch (error) {
+      console.error("Error rejecting admin:", error);
+      alert("Error rejecting admin");
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleDelete = async (adminId: string) => {
+    if (!confirm("Are you sure you want to delete this admin? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsProcessing(adminId);
+    try {
+      const response = await fetch(`/api/admins/${adminId}`, {
+        method: "DELETE",
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove from local state
+        setAdmins((prev) => prev.filter((admin) => admin._id !== adminId));
+        alert("Admin deleted successfully");
+      } else {
+        alert(data.message || "Failed to delete admin");
+      }
+    } catch (error) {
+      console.error("Error deleting admin:", error);
+      alert("Error deleting admin");
+    } finally {
+      setIsProcessing(null);
+    }
+  };
 
   const filteredAdmins = admins.filter((admin) => {
+    const fullName = `${admin.firstName} ${admin.lastName}`.toLowerCase();
     const matchesSearch =
-      admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admin.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === "all" || admin.role === roleFilter;
+      fullName.includes(searchTerm.toLowerCase()) ||
+      admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      admin.department.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || admin.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const payload: AdminAccount = {
-      id: editingAdmin ? editingAdmin.id : Date.now(),
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      role: formData.role,
-      status: formData.status,
-      teams: formData.teams
-        .split(",")
-        .map((team) => team.trim())
-        .filter(Boolean),
-      createdAt: editingAdmin ? editingAdmin.createdAt : new Date().toISOString().split("T")[0],
-      lastActive: editingAdmin ? editingAdmin.lastActive : "Just added"
-    };
-
-    if (editingAdmin) {
-      setAdmins((prev) => prev.map((admin) => (admin.id === editingAdmin.id ? payload : admin)));
-    } else {
-      setAdmins((prev) => [payload, ...prev]);
-    }
-
-    setShowModal(false);
-    setEditingAdmin(null);
-    setFormData({ name: "", email: "", role: "operations", status: "active", teams: "" });
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const handleEdit = (admin: AdminAccount) => {
-    setEditingAdmin(admin);
-    setFormData({
-      name: admin.name,
-      email: admin.email,
-      role: admin.role,
-      status: admin.status,
-      teams: admin.teams.join(", ")
-    });
-    setShowModal(true);
+  const formatLastLogin = (lastLogin?: string) => {
+    if (!lastLogin) return "Never";
+    const date = new Date(lastLogin);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hours ago`;
+    return formatDate(lastLogin);
   };
 
-  const handleDelete = (id: number) => {
-    if (typeof window !== "undefined" && confirm("Remove this admin account?")) {
-      setAdmins((prev) => prev.filter((admin) => admin.id !== id));
-    }
-  };
+  const pendingCount = admins.filter((admin) => admin.status === "pending").length;
+  const approvedCount = admins.filter((admin) => admin.status === "approved").length;
+  const rejectedCount = admins.filter((admin) => admin.status === "rejected").length;
 
-  const activeCount = admins.filter((admin) => admin.status === "active").length;
-  const pendingInvites = admins.filter((admin) => admin.status === "invited").length;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader className="h-12 w-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading admin applications...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Management</h1>
-          <p className="text-gray-600 mt-1">Create, monitor, and govern platform administrator access.</p>
+          <p className="text-gray-600 mt-1">Approve or reject admin applications and manage existing admins.</p>
         </div>
         <button
-          onClick={() => {
-            setEditingAdmin(null);
-            setFormData({ name: "", email: "", role: "operations", status: "active", teams: "" });
-            setShowModal(true);
-          }}
+          onClick={fetchAdmins}
           className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
         >
-          <UserPlus className="h-4 w-4" />
-          Invite Admin
+          <RefreshCw className="h-4 w-4" />
+          Refresh
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Active Admins</p>
-              <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
+              <p className="text-sm text-gray-500">Pending Applications</p>
+              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
             </div>
-            <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
-              <ShieldCheck className="h-5 w-5" />
+            <div className="p-3 bg-yellow-100 text-yellow-600 rounded-lg">
+              <Clock className="h-5 w-5" />
             </div>
           </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Pending Invites</p>
-              <p className="text-2xl font-bold text-gray-900">{pendingInvites}</p>
+              <p className="text-sm text-gray-500">Approved Admins</p>
+              <p className="text-2xl font-bold text-emerald-600">{approvedCount}</p>
             </div>
-            <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
-              <Award className="h-5 w-5" />
+            <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Rejected</p>
+              <p className="text-2xl font-bold text-red-600">{rejectedCount}</p>
+            </div>
+            <div className="p-3 bg-red-100 text-red-600 rounded-lg">
+              <XCircle className="h-5 w-5" />
             </div>
           </div>
         </div>
@@ -194,12 +252,13 @@ export default function AdminManagementPage() {
               <p className="text-2xl font-bold text-gray-900">{admins.length}</p>
             </div>
             <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
-              <UserPlus className="h-5 w-5" />
+              <ShieldCheck className="h-5 w-5" />
             </div>
           </div>
         </div>
       </div>
 
+      {/* Filters and Table */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
         <div className="flex flex-col xl:flex-row xl:items-center gap-4">
           <div className="flex-1 relative">
@@ -213,25 +272,14 @@ export default function AdminManagementPage() {
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
             <select
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
-            >
-              <option value="all">All roles</option>
-              <option value="super">Super Admin</option>
-              <option value="security">Security</option>
-              <option value="operations">Operations</option>
-              <option value="support">Support</option>
-            </select>
-            <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
             >
-              <option value="all">All status</option>
-              <option value="active">Active</option>
-              <option value="invited">Invited</option>
-              <option value="disabled">Disabled</option>
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
         </div>
@@ -240,162 +288,104 @@ export default function AdminManagementPage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin Details</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teams</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Active</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Applied Date</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Login</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredAdmins.map((admin) => (
-                <tr key={admin.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-gray-900">{admin.name}</div>
-                    <p className="text-xs text-gray-500">{admin.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{roleLabels[admin.role]}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClasses[admin.status]}`}>
-                      {admin.status.charAt(0).toUpperCase() + admin.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{admin.teams.join(", ") || "—"}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{admin.lastActive}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEdit(admin)}
-                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-                        title="Edit admin"
-                      >
-                        <Edit className="h-4 w-4 text-gray-500" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(admin.id)}
-                        className="p-2 rounded-lg bg-red-50 hover:bg-red-100"
-                        title="Remove admin"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredAdmins.map((admin) => {
+                const StatusIcon = statusIcons[admin.status];
+                return (
+                  <tr key={admin._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">
+                        {admin.firstName} {admin.lastName}
+                      </div>
+                      <p className="text-xs text-gray-500">{admin.email}</p>
+                      <p className="text-xs text-gray-500">{admin.phone}</p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{admin.department}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                        {roleLabels[admin.role]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <StatusIcon className="h-4 w-4" />
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClasses[admin.status]}`}>
+                          {admin.status.charAt(0).toUpperCase() + admin.status.slice(1)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(admin.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{formatLastLogin(admin.lastLogin)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {admin.status === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(admin._id)}
+                              disabled={isProcessing === admin._id}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium"
+                              title="Approve admin"
+                            >
+                              {isProcessing === admin._id ? (
+                                <Loader className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3" />
+                              )}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(admin._id)}
+                              disabled={isProcessing === admin._id}
+                              className="px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium"
+                              title="Reject admin"
+                            >
+                              {isProcessing === admin._id ? (
+                                <Loader className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3 w-3" />
+                              )}
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {admin.role !== "master_admin" && (
+                          <button
+                            onClick={() => handleDelete(admin._id)}
+                            disabled={isProcessing === admin._id}
+                            className="p-2 rounded-lg bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete admin"
+                          >
+                            {isProcessing === admin._id ? (
+                              <Loader className="h-4 w-4 text-red-500 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {filteredAdmins.length === 0 && (
-          <div className="text-center py-10 text-gray-500 text-sm">No admin accounts match the current filters.</div>
+          <div className="text-center py-10 text-gray-500 text-sm">
+            No admin applications match the current filters.
+          </div>
         )}
       </div>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="w-full max-w-lg">
-            <div className="bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {editingAdmin ? "Update Admin" : "Invite New Admin"}
-                  </h2>
-                  <p className="text-sm text-gray-500">Assign role, initial status and team visibility.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowModal(false);
-                    setEditingAdmin(null);
-                    setFormData({ name: "", email: "", role: "operations", status: "active", teams: "" });
-                  }}
-                  className="p-2 rounded-full hover:bg-gray-100"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                  <input
-                    value={formData.name}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, email: event.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                    <select
-                      value={formData.role}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, role: event.target.value as AdminRole }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
-                    >
-                      <option value="super">Super Admin</option>
-                      <option value="operations">Operations</option>
-                      <option value="security">Security</option>
-                      <option value="support">Support</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, status: event.target.value as AdminStatus }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
-                    >
-                      <option value="active">Active</option>
-                      <option value="invited">Invited</option>
-                      <option value="disabled">Disabled</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Teams (comma separated)</label>
-                  <input
-                    value={formData.teams}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, teams: event.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
-                    placeholder="Leadership, Security, ..."
-                  />
-                </div>
-
-                <div className="flex flex-col md:flex-row md:justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      setEditingAdmin(null);
-                      setFormData({ name: "", email: "", role: "operations", status: "active", teams: "" });
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
-                    {editingAdmin ? "Save Changes" : "Send Invite"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

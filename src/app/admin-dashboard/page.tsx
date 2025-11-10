@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -22,12 +23,17 @@ import {
   Settings,
   Filter,
   Plus,
+  User,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 
 import CustomDashboardPage from "../../components/admin/CustomDashboardPage";
 import UserManagementPage from "../../components/admin/UserManagementPage";
 import VendorManagementPage from "../../components/admin/VendorManagementPage";
 import AdvancedAnalyticsPage from "../../components/admin/AdvancedAnalyticsPage";
+import AdminManagementPage from "../../components/master/AdminManagementPage";
+import AdminProfilePage from "../../components/admin/AdminProfilePage";
 
 import ProductsPage from "../../components/vendor/ProductsPage";
 import ProductFormPage from "../../components/vendor/ProductFormPage";
@@ -44,16 +50,89 @@ import HelpPage from "../../components/vendor/HelpPage";
 import MessagesPage from "../../components/vendor/MessagesPage";
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("custom-dashboard");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [adminData, setAdminData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+
+  // Authentication check
+  useEffect(() => {
+    const adminToken = localStorage.getItem("adminToken");
+    const adminDataString = localStorage.getItem("adminData");
+
+    if (!adminToken || !adminDataString) {
+      router.push("/admin-login");
+      return;
+    }
+
+    try {
+      const parsedAdminData = JSON.parse(adminDataString);
+      // Check if admin is approved
+      if (parsedAdminData.status !== "approved") {
+        alert("Your admin account is pending approval. Please wait for master admin to approve your request.");
+        localStorage.removeItem("adminToken");
+        localStorage.removeItem("adminData");
+        router.push("/admin-login");
+        return;
+      }
+      setAdminData(parsedAdminData);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error parsing admin data:', error);
+      router.push("/admin-login");
+      return;
+    }
+  }, [router]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (profileDropdownOpen && !target.closest('.relative')) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileDropdownOpen]);
+
+  const handleLogout = () => {
+    if (confirm("Are you sure you want to logout?")) {
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminData");
+      router.push("/admin-login");
+    }
+  };
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const primaryItems = [
     { id: "custom-dashboard", label: "Overview", icon: LayoutDashboard },
     { id: "users", label: "Users", icon: Users },
-    { id: "settings", label: "Settings", icon: Settings },
+    ...(adminData?.role === "master_admin" ? [{ id: "admin-management", label: "Admin Management", icon: Shield }] : []),
+    { id: "admin-profile", label: "Profile", icon: User },
+  
     { id: "website-settings", label: "Website Settings", icon: Filter },
-    { id: "advanced-analytics", label: "Advanced Analytics", icon: BarChartBig },
+   
   ];
 
   const managementItems = [
@@ -61,7 +140,7 @@ export default function AdminDashboard() {
     { id: "orders", label: "Orders", icon: ShoppingCart },
     { id: "discount", label: "Discounts", icon: Percent },
     { id: "integrations", label: "Integrations", icon: Grid3X3 },
-    { id: "invoice", label: "Billing", icon: CreditCard },
+    
   ];
 
   const supportItems = [
@@ -79,6 +158,10 @@ export default function AdminDashboard() {
         return <UserManagementPage />;
       case "vendors":
         return <VendorManagementPage />;
+      case "admin-management":
+        return <AdminManagementPage />;
+      case "admin-profile":
+        return <AdminProfilePage />;
       case "advanced-analytics":
         return <AdvancedAnalyticsPage />;
       case "products":
@@ -227,14 +310,51 @@ export default function AdminDashboard() {
                   4
                 </span>
               </button>
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-purple-500 grid place-items-center text-white text-sm font-bold">
-                  AD
-                </div>
-                <div className="hidden md:block">
-                  <div className="text-sm font-medium text-gray-900">Alex Doe</div>
-                  <div className="text-xs text-gray-500">Platform Admin</div>
-                </div>
+              <div className="relative">
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center gap-3 hover:bg-gray-50 rounded-lg p-2 transition-colors"
+                >
+                  <div className="h-9 w-9 rounded-full bg-purple-500 grid place-items-center text-white text-sm font-bold">
+                    {adminData?.username?.substring(0, 2).toUpperCase() || "AD"}
+                  </div>
+                  <div className="hidden md:block text-left">
+                    <div className="text-sm font-medium text-gray-900">{adminData?.username}</div>
+                    <div className="text-xs text-gray-500">
+                      {adminData?.role === "master_admin" ? "Master Admin" : "Admin"}
+                    </div>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${profileDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                    <div className="px-4 py-3 border-b border-gray-200">
+                      <p className="text-sm font-medium text-gray-900">{adminData?.username}</p>
+                      <p className="text-xs text-gray-500">{adminData?.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab("admin-profile");
+                        setProfileDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <User className="h-4 w-4" />
+                      View Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -253,7 +373,10 @@ export default function AdminDashboard() {
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-40 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => {
+            setSidebarOpen(false);
+            setProfileDropdownOpen(false);
+          }}
         />
       )}
     </div>

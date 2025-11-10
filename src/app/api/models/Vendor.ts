@@ -175,7 +175,7 @@ const VendorSchema: Schema<IVendor> = new Schema(
     },
     averageOrderValue: {
       type: String,
-      enum: ["under-50", "50-100", "100-250", "250-500", "over-500"],
+      maxlength: [100, "Average order value can not be more than 100 characters"],
     },
     monthlyVolume: {
       type: String,
@@ -195,8 +195,8 @@ const VendorSchema: Schema<IVendor> = new Schema(
     bankAccount: {
       type: String,
       required: [true, "Please add bank account information"],
-      maxlength: [4, "Bank account should be last 4 digits only"],
-      minlength: [4, "Bank account should be last 4 digits only"],
+      maxlength: [30, "Bank account number can not be more than 30 characters"],
+      minlength: [4, "Bank account number must be at least 4 characters"],
     },
 
     // Status and Verification

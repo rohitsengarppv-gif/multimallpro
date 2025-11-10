@@ -1,73 +1,184 @@
-import { useState } from "react";
-import { Upload, Save, RefreshCw, Palette, Globe, Eye, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, Save, RefreshCw, Globe, Eye, X, Loader2, Settings, Palette } from "lucide-react";
 
-interface BrandingPreview {
+interface HomeSettings {
+  _id?: string;
   name: string;
   tagline: string;
-  primaryColor: string;
-  secondaryColor: string;
-  logoUrl: string;
-  faviconUrl: string;
+  logo?: {
+    public_id?: string;
+    url: string;
+  };
+  favicon?: {
+    public_id?: string;
+    url: string;
+  };
   supportEmail: string;
   supportPhone: string;
   footerMessage: string;
+  announcement: {
+    enabled: boolean;
+    message: string;
+    link: string;
+  };
 }
 
-const defaultBranding: BrandingPreview = {
+const defaultSettings: HomeSettings = {
   name: "MultiVendor",
   tagline: "Where Great Products Meet Happy Customers",
-  primaryColor: "#7c3aed",
-  secondaryColor: "#f97316",
-  logoUrl: "https://dummyimage.com/200x80/7c3aed/ffffff&text=MultiVendor",
-  faviconUrl: "https://dummyimage.com/64x64/f97316/ffffff&text=MV",
   supportEmail: "support@multivendor.com",
   supportPhone: "+1 (555) 123-4567",
-  footerMessage: "© 2024 MultiVendor. All rights reserved."
+  footerMessage: "© 2024 MultiVendor. All rights reserved.",
+  announcement: {
+    enabled: false,
+    message: "",
+    link: ""
+  }
 };
 
 export default function WebsiteSettingsPage() {
-  const [branding, setBranding] = useState(defaultBranding);
-  const [draft, setDraft] = useState(defaultBranding);
-  const [announcement, setAnnouncement] = useState({
-    enabled: true,
-    message: "Holiday Sale Week! Free shipping on orders over $50.",
-    link: "/deals",
-  });
+  const [settings, setSettings] = useState<HomeSettings>(defaultSettings);
+  const [draft, setDraft] = useState<HomeSettings>(defaultSettings);
   const [showLogoPreview, setShowLogoPreview] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, key: "logoUrl" | "faviconUrl") => {
+  // Fetch settings on component mount
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/routes/home-settings');
+      const data = await response.json();
+
+      if (data.success) {
+        setSettings(data.data);
+        setDraft(data.data);
+      } else {
+        showMessage('error', data.message || 'Failed to load settings');
+      }
+    } catch (error) {
+      console.error('Fetch settings error:', error);
+      showMessage('error', 'Failed to load settings');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const showMessage = (type: 'success' | 'error', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 5000);
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, key: "logo" | "favicon") => {
     const file = event.target.files?.[0];
     if (!file) return;
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      showMessage('error', 'Image size should be less than 2MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showMessage('error', 'Please upload an image file');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (result) => {
       const url = typeof result.target?.result === "string" ? result.target.result : "";
-      setDraft((prev) => ({ ...prev, [key]: url }));
+      setDraft((prev) => ({ 
+        ...prev, 
+        [key]: { 
+          url,
+          public_id: '' 
+        } 
+      }));
     };
     reader.readAsDataURL(file);
   };
 
   const handleReset = () => {
-    if (typeof window !== "undefined" && confirm("Reset all branding changes?")) {
-      setDraft(branding);
+    if (typeof window !== "undefined" && confirm("Reset all changes to last saved state?")) {
+      setDraft(settings);
+      showMessage('success', 'Changes reset');
     }
   };
 
-  const handleSave = () => {
-    setBranding(draft);
-    alert("Branding changes saved.");
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      const response = await fetch('/api/routes/home-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(draft),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSettings(data.data);
+        setDraft(data.data);
+        showMessage('success', 'Settings saved successfully!');
+      } else {
+        showMessage('error', data.message || 'Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Save settings error:', error);
+      showMessage('error', 'Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const primaryStyles = {
-    backgroundColor: draft.primaryColor,
-    borderColor: draft.primaryColor,
-    color: draft.primaryColor,
+  const handleResetToDefault = async () => {
+    if (!confirm('Reset all settings to default? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      
+      const response = await fetch('/api/routes/home-settings', {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSettings(data.data);
+        setDraft(data.data);
+        showMessage('success', 'Settings reset to default successfully!');
+      } else {
+        showMessage('error', data.message || 'Failed to reset settings');
+      }
+    } catch (error) {
+      console.error('Reset settings error:', error);
+      showMessage('error', 'Failed to reset settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const secondaryStyles = {
-    backgroundColor: draft.secondaryColor,
-    borderColor: draft.secondaryColor,
-    color: draft.secondaryColor,
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -79,20 +190,43 @@ export default function WebsiteSettingsPage() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className="h-4 w-4" />
             Reset Changes
           </button>
           <button
-            onClick={handleSave}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+            onClick={handleResetToDefault}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="h-4 w-4" />
-            Save Branding
+            <Settings className="h-4 w-4" />
+            Reset to Default
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isSaving ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </div>
+
+      {/* Message Banner */}
+      {message && (
+        <div className={`p-4 rounded-lg ${
+          message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <p className="text-sm font-medium">{message.text}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
@@ -155,67 +289,33 @@ export default function WebsiteSettingsPage() {
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Colors & Identity</h2>
-                <p className="text-sm text-gray-500">Choose brand colors used in buttons, highlights, and badges.</p>
+                <h2 className="text-lg font-semibold text-gray-900">Logo & Favicon</h2>
+                <p className="text-sm text-gray-500">Upload your brand logo and favicon images.</p>
               </div>
-              <Globe className="h-5 w-5 text-orange-500" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={draft.primaryColor}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, primaryColor: event.target.value }))}
-                    className="h-10 w-16 rounded border border-gray-300"
-                  />
-                  <input
-                    value={draft.primaryColor}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, primaryColor: event.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={draft.secondaryColor}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, secondaryColor: event.target.value }))}
-                    className="h-10 w-16 rounded border border-gray-300"
-                  />
-                  <input
-                    value={draft.secondaryColor}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, secondaryColor: event.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  />
-                </div>
-              </div>
+              <Upload className="h-5 w-5 text-purple-500" />
             </div>
 
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 cursor-pointer hover:border-purple-500 text-sm text-gray-500">
-                  {draft.logoUrl ? (
-                    <img src={draft.logoUrl} alt="Logo preview" className="h-20 object-contain" />
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 cursor-pointer hover:border-purple-500 text-sm text-gray-500 transition-colors">
+                  {draft.logo?.url ? (
+                    <img src={draft.logo.url} alt="Logo preview" className="h-20 object-contain" />
                   ) : (
                     <>
                       <Upload className="h-6 w-6 text-gray-400" />
                       <span>Click to upload logo</span>
+                      <span className="text-xs text-gray-400 mt-1">Max 2MB</span>
                     </>
                   )}
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(event) => handleImageUpload(event, "logoUrl")}
+                    onChange={(event) => handleImageUpload(event, "logo")}
                   />
                 </label>
-                {draft.logoUrl && (
+                {draft.logo?.url && (
                   <button
                     onClick={() => setShowLogoPreview(true)}
                     className="mt-2 text-xs text-purple-600 hover:underline flex items-center gap-1"
@@ -226,20 +326,21 @@ export default function WebsiteSettingsPage() {
               </div>
               <div className="w-36">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Favicon</label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 cursor-pointer hover:border-purple-500 text-sm text-gray-500">
-                  {draft.faviconUrl ? (
-                    <img src={draft.faviconUrl} alt="Favicon preview" className="h-12 object-contain" />
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 cursor-pointer hover:border-purple-500 text-sm text-gray-500 transition-colors">
+                  {draft.favicon?.url ? (
+                    <img src={draft.favicon.url} alt="Favicon preview" className="h-12 object-contain" />
                   ) : (
                     <>
                       <Upload className="h-6 w-6 text-gray-400" />
-                      <span>Upload favicon</span>
+                      <span className="text-[11px]">Upload favicon</span>
+                      <span className="text-[10px] text-gray-400 mt-1">Max 2MB</span>
                     </>
                   )}
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(event) => handleImageUpload(event, "faviconUrl")}
+                    onChange={(event) => handleImageUpload(event, "favicon")}
                   />
                 </label>
               </div>
@@ -258,8 +359,8 @@ export default function WebsiteSettingsPage() {
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
-                checked={announcement.enabled}
-                onChange={(event) => setAnnouncement((prev) => ({ ...prev, enabled: event.target.checked }))}
+                checked={draft.announcement.enabled}
+                onChange={(event) => setDraft((prev) => ({ ...prev, announcement: { ...prev.announcement, enabled: event.target.checked } }))}
                 className="h-4 w-4"
                 id="announcement-enabled"
               />
@@ -270,8 +371,8 @@ export default function WebsiteSettingsPage() {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Announcement Message</label>
                 <textarea
-                  value={announcement.message}
-                  onChange={(event) => setAnnouncement((prev) => ({ ...prev, message: event.target.value }))}
+                  value={draft.announcement.message}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, announcement: { ...prev.announcement, message: event.target.value } }))}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
@@ -279,8 +380,8 @@ export default function WebsiteSettingsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Link</label>
                 <input
-                  value={announcement.link}
-                  onChange={(event) => setAnnouncement((prev) => ({ ...prev, link: event.target.value }))}
+                  value={draft.announcement.link}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, announcement: { ...prev.announcement, link: event.target.value } }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
@@ -291,41 +392,32 @@ export default function WebsiteSettingsPage() {
         <div className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 space-y-4 sticky top-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Live Preview</h2>
-              <Palette className="h-5 w-5 text-purple-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Preview</h2>
+              <Eye className="h-5 w-5 text-purple-500" />
             </div>
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <div className="bg-gray-900 text-white px-4 py-3 text-sm">/homepage</div>
-              <div className="p-6 space-y-4" style={{ borderTop: `4px solid ${draft.primaryColor}` }}>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="h-12 w-12 rounded-lg grid place-items-center text-white text-sm font-bold"
-                    style={primaryStyles}
-                  >
-                    {draft.name.charAt(0).toUpperCase()}
+              <div className="p-6 space-y-4 border-t-4 border-purple-500">
+                {/* Logo Preview */}
+                {draft.logo?.url && (
+                  <div className="flex justify-center py-2">
+                    <img src={draft.logo.url} alt="Logo" className="h-16 object-contain" />
                   </div>
-                  <div>
-                    <div className="text-lg font-semibold text-gray-900">{draft.name}</div>
-                    <div className="text-sm text-gray-500">{draft.tagline}</div>
-                  </div>
+                )}
+                
+                {/* Brand Info */}
+                <div className="text-center">
+                  <div className="text-xl font-bold text-gray-900">{draft.name}</div>
+                  <div className="text-sm text-gray-500 mt-1">{draft.tagline}</div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 text-xs font-semibold text-white rounded-full" style={primaryStyles}>
-                    Primary Button
-                  </span>
-                  <span className="px-3 py-1 text-xs font-semibold text-white rounded-full" style={secondaryStyles}>
-                    Secondary Button
-                  </span>
-                  <span className="px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-300 rounded-full">
-                    Neutral
-                  </span>
-                </div>
-                {announcement.enabled && (
+
+                {/* Announcement Preview */}
+                {draft.announcement.enabled && draft.announcement.message && (
                   <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3">
-                    <p className="text-sm font-medium text-purple-700">{announcement.message}</p>
-                    {announcement.link && (
-                      <a href={announcement.link} className="text-xs text-purple-500 hover:underline">
-                        Visit {announcement.link}
+                    <p className="text-sm font-medium text-purple-700">{draft.announcement.message}</p>
+                    {draft.announcement.link && (
+                      <a href={draft.announcement.link} className="text-xs text-purple-600 hover:underline mt-1 inline-block">
+                        {draft.announcement.link}
                       </a>
                     )}
                   </div>
@@ -348,7 +440,7 @@ export default function WebsiteSettingsPage() {
             </button>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Logo Preview</h2>
             <div className="border border-dashed border-gray-300 rounded-xl p-6 grid place-items-center">
-              <img src={draft.logoUrl} alt="Logo preview" className="max-h-32 object-contain" />
+              <img src={draft.logo?.url} alt="Logo preview" className="max-h-32 object-contain" />
             </div>
           </div>
         </div>
