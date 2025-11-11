@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  User,
   Store,
   BarChartBig,
   Package,
@@ -21,16 +23,32 @@ import {
   Mail,
   Bell,
   Settings,
+  LogOut,
+  Image,
 } from "lucide-react";
 
 import MasterOverviewPage from "../../components/master/MasterOverviewPage";
 import AdminManagementPage from "../../components/master/AdminManagementPage";
+import MasterProfilePage from "../../components/master/MasterProfilePage";
 
 import CustomDashboardPage from "../../components/admin/CustomDashboardPage";
 import UserManagementPage from "../../components/admin/UserManagementPage";
 import VendorManagementPage from "../../components/admin/VendorManagementPage";
 import AdvancedAnalyticsPage from "../../components/admin/AdvancedAnalyticsPage";
 import WebsiteSettingsPage from "../../components/admin/WebsiteSettingsPage";
+import UserDetailPage from "../../components/admin/UserDetailPage";
+import AdminProfilePage from "../../components/admin/AdminProfilePage";
+
+// New Admin Pages
+import AdminProductsPage from "../../components/admin/ProductsPage";
+import AdminProductDetailPage from "../../components/admin/ProductDetailPage";
+import AdminOrdersPage from "../../components/admin/OrdersPage";
+import AdminOrderDetailPage from "../../components/admin/OrderDetailPage";
+import AdminCustomersPage from "../../components/admin/CustomersPage";
+import AdminCategoriesPage from "../../components/admin/CategoriesManagementPage";
+import AdminSubCategoriesPage from "../../components/admin/SubCategoriesPage";
+import AdminDiscountsPage from "../../components/admin/DiscountsPage";
+import HelpManagementPage from "../../components/admin/HelpManagementPage";
 
 import ProductsPage from "../../components/vendor/ProductsPage";
 import ProductFormPage from "../../components/vendor/ProductFormPage";
@@ -45,36 +63,101 @@ import SecurityPage from "../../components/vendor/SecurityPage";
 import HelpPage from "../../components/vendor/HelpPage";
 
 export default function MasterAdminDashboard() {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("master-overview");
+  const [activeTab, setActiveTab] = useState("custom-dashboard");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserType, setSelectedUserType] = useState<"customer" | "vendor">("customer");
+  const [masterData, setMasterData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Authentication check
+  useEffect(() => {
+    const masterToken = localStorage.getItem("masterToken");
+    const masterDataString = localStorage.getItem("masterData");
+
+    if (!masterToken || !masterDataString) {
+      router.push("/master-admin-login");
+      return;
+    }
+
+    try {
+      const parsedData = JSON.parse(masterDataString);
+      
+      // Verify role is master
+      if (parsedData.role !== "master" && parsedData.role !== "master_admin") {
+        localStorage.removeItem("masterToken");
+        localStorage.removeItem("masterData");
+        router.push("/master-admin-login");
+        return;
+      }
+
+      setMasterData(parsedData);
+    } catch (error) {
+      console.error("Error parsing master data:", error);
+      router.push("/master-admin-login");
+      return;
+    }
+
+    setIsLoading(false);
+  }, [router]);
+
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
+
+  // Handle navigation to external pages
+  useEffect(() => {
+    if (activeTab === "hero-banners") {
+      router.push("/admin/hero-banners");
+    }
+  }, [activeTab, router]);
+
+  const handleLogout = () => {
+    if (confirm("Are you sure you want to logout?")) {
+      localStorage.removeItem("masterToken");
+      localStorage.removeItem("masterData");
+      router.push("/master-admin-login");
+    }
+  };
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading master admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const administrationItems = [
-    { id: "master-overview", label: "Master Overview", icon: LayoutDashboard },
+   
     { id: "custom-dashboard", label: "Admin Overview", icon: LayoutDashboard },
-    { id: "users", label: "Users", icon: Users },
-    { id: "vendors", label: "Vendors", icon: Store },
+    { id: "user-details", label: "User Detail", icon: BarChartBig },
+    { id: "admin-management", label: "Admin Management", icon: ShieldCheck },
+    { id: "admin-profile", label: "Profile", icon: User },
     { id: "website-settings", label: "Website Settings", icon: Settings },
-    { id: "advanced-analytics", label: "Advanced Analytics", icon: BarChartBig },
   ];
 
   const managementItems = [
-    { id: "products", label: "Products", icon: Package },
-    { id: "orders", label: "Orders", icon: ShoppingCart },
-    { id: "discount", label: "Discounts", icon: Percent },
-    { id: "integrations", label: "Integrations", icon: Grid3X3 },
-    { id: "invoice", label: "Billing", icon: CreditCard },
+    { id: "admin-products", label: "Products", icon: Package },
+    { id: "admin-orders", label: "Orders", icon: ShoppingCart },
+    { id: "admin-categories", label: "Categories", icon: Grid3X3 },
+    { id: "admin-subcategories", label: "Subcategories", icon: Grid3X3 },
+    { id: "admin-discounts", label: "Discounts", icon: Percent },
+    { id: "users", label: "Users", icon: Users },
+    { id: "vendors", label: "Vendors", icon: Store },
+    { id: "hero-banners", label: "Hero Banners", icon: Image },
   ];
 
   const supportItems = [
-    { id: "customers", label: "Customers", icon: Users },
-    { id: "messages", label: "Messages", icon: MessageSquare },
-    { id: "security", label: "Security", icon: Shield },
-    { id: "help", label: "Help Center", icon: HelpCircle },
-  ];
-
-  const governanceItems = [
-    { id: "admin-management", label: "Admin Management", icon: ShieldCheck },
+    { id: "help-management", label: "Help Management", icon: HelpCircle },
+    
   ];
 
   const renderContent = () => {
@@ -126,6 +209,100 @@ export default function MasterAdminDashboard() {
         return <HelpPage />;
       case "admin-management":
         return <AdminManagementPage />;
+      case "admin-profile":
+        return <MasterProfilePage />;
+      case "user-details":
+        if (!selectedUserId) {
+          return (
+            <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <p className="text-gray-600">No user selected. Please choose a user from the Users tab.</p>
+              <button
+                onClick={() => setActiveTab("users")}
+                className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Go to Users
+              </button>
+            </div>
+          );
+        }
+        return (
+          <UserDetailPage
+            userId={selectedUserId}
+            userType={selectedUserType}
+            onBack={() => setActiveTab("users")}
+          />
+        );
+      
+      // New Admin Pages
+      case "admin-products":
+        return (
+          <AdminProductsPage
+            onViewProduct={(productId: string) => {
+              setSelectedProductId(productId);
+              setActiveTab("admin-product-detail");
+            }}
+          />
+        );
+      case "admin-product-detail":
+        return selectedProductId ? (
+          <AdminProductDetailPage 
+            productId={selectedProductId}
+            onBack={() => {
+              setSelectedProductId(null);
+              setActiveTab("admin-products");
+            }}
+          />
+        ) : (
+          <AdminProductsPage onViewProduct={(productId: string) => {
+            setSelectedProductId(productId);
+            setActiveTab("admin-product-detail");
+          }} />
+        );
+      case "admin-orders":
+        return (
+          <AdminOrdersPage
+            onViewOrder={(orderId: string) => {
+              setSelectedOrderId(orderId);
+              setActiveTab("admin-order-detail");
+            }}
+          />
+        );
+      case "admin-order-detail":
+        return selectedOrderId ? (
+          <AdminOrderDetailPage 
+            orderId={selectedOrderId}
+            onBack={() => {
+              setSelectedOrderId(null);
+              setActiveTab("admin-orders");
+            }}
+          />
+        ) : (
+          <AdminOrdersPage onViewOrder={(orderId: string) => {
+            setSelectedOrderId(orderId);
+            setActiveTab("admin-order-detail");
+          }} />
+        );
+      case "admin-customers":
+        return <AdminCustomersPage />;
+      case "admin-categories":
+        return <AdminCategoriesPage />;
+      case "admin-subcategories":
+        return <AdminSubCategoriesPage />;
+      case "admin-discounts":
+        return <AdminDiscountsPage />;
+      case "hero-banners":
+        return (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Redirecting to Hero Banners...</p>
+            </div>
+          </div>
+        );
+      case "help-management":
+        return <HelpManagementPage />;
+      
+      // Old vendor pages (keeping for backward compatibility)
       case "product-form":
         return (
           <ProductFormPage
@@ -199,7 +376,6 @@ export default function MasterAdminDashboard() {
           {renderSection("Administration", administrationItems)}
           {renderSection("Management", managementItems)}
           {renderSection("Support", supportItems)}
-          {renderSection("Governance", governanceItems)}
         </nav>
       </aside>
 
@@ -227,26 +403,23 @@ export default function MasterAdminDashboard() {
             </div>
 
             <div className="flex items-center gap-4">
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-                <Mail className="h-5 w-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-purple-600 text-white text-xs rounded-full flex items-center justify-center">
-                  12
-                </span>
-              </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-emerald-500 text-white text-xs rounded-full flex items-center justify-center">
-                  6
-                </span>
-              </button>
+              
+            
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full bg-purple-600 grid place-items-center text-white text-sm font-bold">
-                  MA
+                  {masterData?.name?.charAt(0).toUpperCase() || "M"}
                 </div>
                 <div className="hidden md:block">
-                  <div className="text-sm font-medium text-gray-900">Morgan Avery</div>
+                  <div className="text-sm font-medium text-gray-900">{masterData?.name || "Master Admin"}</div>
                   <div className="text-xs text-gray-500">Master Administrator</div>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="ml-2 p-2 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-red-600"
+                  title="Logout"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
               </div>
             </div>
           </div>

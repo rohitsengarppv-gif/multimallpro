@@ -1,60 +1,85 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Laptop, Watch, Headphones, Sparkles, BadgePercent, ArrowRight, Zap } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Laptop, Watch, Headphones, Sparkles, BadgePercent, ArrowRight, Zap, ShoppingCart, Grid3X3, Package, Loader2 } from "lucide-react";
 
-const smallPromos = [
+interface Category {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: {
+    url: string;
+    public_id: string;
+  };
+  status: string;
+}
+
+interface PromoCategory {
+  id: string;
+  title: string;
+  subtitle: string;
+  chip: string;
+  icon: React.ReactElement;
+  bg: string;
+  borderColor: string;
+  chipBg: string;
+  chipText: string;
+  iconColor: string;
+  bgImage: string;
+  slug: string;
+}
+
+// Color schemes for categories
+const colorSchemes = [
   {
-    id: "laptop",
-    title: "Laptops Max",
-    subtitle: "From $999.00 or $84.92/mo",
-    chip: "BEST SALE",
-    icon: <Laptop className="h-7 w-7" />,
     bg: "from-sky-100 via-cyan-50 to-blue-50",
     borderColor: "border-sky-200",
     chipBg: "bg-sky-100",
     chipText: "text-sky-700",
     iconColor: "text-sky-600",
-    bgImage: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&auto=format&fit=crop",
   },
   {
-    id: "ipad",
-    title: "Buy iPad Air",
-    subtitle: "From $599 or $50/mo",
-    chip: "NEW ARRIVAL",
-    icon: <Sparkles className="h-7 w-7" />,
     bg: "from-amber-100 via-orange-50 to-yellow-50",
     borderColor: "border-amber-200",
     chipBg: "bg-amber-100",
     chipText: "text-amber-700",
     iconColor: "text-amber-600",
-    bgImage: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800&auto=format&fit=crop",
   },
   {
-    id: "watch",
-    title: "Smartwatch 7",
-    subtitle: "Latest bands & styles",
-    chip: "OFF 15%",
-    icon: <Watch className="h-7 w-7" />,
     bg: "from-emerald-100 via-teal-50 to-green-50",
     borderColor: "border-emerald-200",
     chipBg: "bg-emerald-100",
     chipText: "text-emerald-700",
     iconColor: "text-emerald-600",
-    bgImage: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop",
   },
   {
-    id: "airpods",
-    title: "AirPods Max",
-    subtitle: "Hi‑Fidelity wireless",
-    chip: "FREE SHIPPING",
-    icon: <Headphones className="h-7 w-7" />,
     bg: "from-indigo-100 via-blue-50 to-purple-50",
     borderColor: "border-indigo-200",
     chipBg: "bg-indigo-100",
     chipText: "text-indigo-700",
     iconColor: "text-indigo-600",
-    bgImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop",
   },
+];
+
+// Icons for categories
+const categoryIcons = [
+  <Laptop className="h-7 w-7" />,
+  <Sparkles className="h-7 w-7" />,
+  <Watch className="h-7 w-7" />,
+  <Headphones className="h-7 w-7" />,
+  <ShoppingCart className="h-7 w-7" />,
+  <Grid3X3 className="h-7 w-7" />,
+  <Package className="h-7 w-7" />,
+];
+
+
+
+// Fallback images
+const fallbackImages = [
+  "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop",
 ];
 
 const slides = [
@@ -78,6 +103,8 @@ export default function PromoShowcase() {
   const [idx, setIdx] = useState(0);
   const [hoveredPromo, setHoveredPromo] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [smallPromos, setSmallPromos] = useState<PromoCategory[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -88,12 +115,86 @@ export default function PromoShowcase() {
     return () => clearInterval(t);
   }, []);
 
+  // Fetch random categories and transform to promo format
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/routes/categories?role=admin&status=active&limit=20");
+        const result = await response.json();
+        
+        if (result.success) {
+          const categoriesData = Array.isArray(result.data)
+            ? result.data
+            : Array.isArray(result.data?.categories)
+            ? result.data.categories
+            : [];
+          
+          // Get random 4 categories
+          const shuffled = categoriesData.sort(() => 0.5 - Math.random());
+          const selectedCategories = shuffled.slice(0, 4);
+          
+          // Transform to promo format
+          const transformedPromos: PromoCategory[] = selectedCategories.map((category: Category, index: number) => {
+            const colorScheme = colorSchemes[index % colorSchemes.length];
+            const icon = categoryIcons[index % categoryIcons.length];
+            const chips = ["BEST SALE", "NEW ARRIVAL", "OFF 15%", "FREE SHIPPING"];
+            const chip = chips[index % chips.length];
+            const bgImage = category.image?.url || fallbackImages[index % fallbackImages.length];
+            
+            return {
+              id: category._id,
+              title: category.name,
+              subtitle: category.description || `Explore ${category.name}`,
+              chip,
+              icon,
+              bg: colorScheme.bg,
+              borderColor: colorScheme.borderColor,
+              chipBg: colorScheme.chipBg,
+              chipText: colorScheme.chipText,
+              iconColor: colorScheme.iconColor,
+              bgImage,
+              slug: category.slug,
+            };
+          });
+          
+          setSmallPromos(transformedPromos);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setSmallPromos([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  const handlePromoClick = (slug: string) => {
+    window.location.href = `/shop?category=${slug}`;
+  };
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 bg-gradient-to-b from-white to-gray-50">
       <div className="grid grid-cols-12 gap-6">
         {/* Left: 2x2 small promos */}
         <div className="col-span-12 md:col-span-5 grid grid-cols-2 gap-5">
-          {smallPromos.map((p, pidx) => (
+          {loading ? (
+            <div className="col-span-2 flex items-center justify-center py-20">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-rose-600 mx-auto mb-3" />
+                <p className="text-gray-600">Loading categories...</p>
+              </div>
+            </div>
+          ) : smallPromos.length === 0 ? (
+            <div className="col-span-2 flex items-center justify-center py-20">
+              <div className="text-center">
+                <p className="text-gray-600">No categories available</p>
+              </div>
+            </div>
+          ) : (
+            smallPromos.map((p, pidx) => (
             <article 
               key={p.id} 
               className={`group overflow-hidden rounded-2xl border-2 ${p.borderColor} shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 animate-scaleIn relative ${
@@ -137,7 +238,10 @@ export default function PromoShowcase() {
                 </div>
                 
                 <div className="mt-4 flex items-center justify-between relative z-10">
-                  <button className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 group-hover:gap-2 transition-all duration-200 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-md">
+                  <button 
+                    onClick={() => handlePromoClick(p.slug)}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 group-hover:gap-2 transition-all duration-200 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-md"
+                  >
                     Shop Now
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
@@ -149,7 +253,8 @@ export default function PromoShowcase() {
                 </div>
               </div>
             </article>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Right: Big banner */}
@@ -187,10 +292,7 @@ export default function PromoShowcase() {
                   <p className="text-sm text-white/95 leading-relaxed font-semibold drop-shadow-lg">
                     {s.desc}
                   </p>
-                  <button className="mt-3 inline-flex w-fit items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-gray-900 hover:bg-gray-100 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200">
-                    {s.cta}
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
+                  
                 </div>
               </div>
             ))}

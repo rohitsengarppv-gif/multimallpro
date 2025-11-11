@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import { useCart } from "../../contexts/CartContext";
 import { 
   Star, 
   Heart, 
@@ -13,7 +14,8 @@ import {
   Filter,
   Grid3X3,
   List,
-  Zap
+  Zap,
+  Loader2
 } from "lucide-react";
 
 type FeaturedProduct = {
@@ -34,7 +36,8 @@ type FeaturedProduct = {
   discount?: number;
 };
 
-const featuredProducts: FeaturedProduct[] = [
+// Removed hardcoded products - will fetch from API
+const demoProducts: FeaturedProduct[] = [
   {
     id: "1",
     name: "Premium Wireless Noise-Canceling Headphones",
@@ -157,24 +160,241 @@ const badges = [
 ];
 
 export default function FeaturedPage() {
+  const { addItem } = useCart();
   const [selectedBadge, setSelectedBadge] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("rating");
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
+  const [products, setProducts] = useState<FeaturedProduct[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleLike = (id: string) => {
-    setLikedItems(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+  // Check wishlist status for all products
+  const checkWishlistStatus = async (products: FeaturedProduct[]) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) return;
+
+    try {
+      const user = JSON.parse(userData);
+      
+      const wishlistChecks = await Promise.all(
+        products.map(async (product) => {
+          try {
+            const response = await fetch(`/api/routes/wishlist?productId=${product.id}`, {
+              headers: {
+                "x-user-id": user.id,
+              },
+            });
+            const data = await response.json();
+            return {
+              productId: product.id,
+              inWishlist: data.success && data.data.inWishlist
+            };
+          } catch (error) {
+            return {
+              productId: product.id,
+              inWishlist: false
+            };
+          }
+        })
+      );
+
+      const wishlistedItems = new Set(
+        wishlistChecks
+          .filter(item => item.inWishlist)
+          .map(item => item.productId)
+      );
+      
+      setLikedItems(wishlistedItems);
+    } catch (error) {
+      console.error("Error checking wishlist status:", error);
+    }
   };
 
-  const filteredProducts = featuredProducts.filter(product => {
+  // Fetch all products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/routes/products?active=true&limit=100");
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          // Transform to FeaturedProduct format
+          const transformedProducts: FeaturedProduct[] = data.data.products.map((product: any) => {
+            const discount = product.comparePrice 
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : undefined;
+            
+            // Assign badge based on various criteria
+            let badge: "bestseller" | "trending" | "premium" | "new";
+            if (product.rating >= 4.7) badge = "bestseller";
+            else if (discount && discount >= 30) badge = "trending";
+            else if (product.price > 500) badge = "premium";
+            else badge = "new";
+
+            return {
+              id: product._id,
+              name: product.name,
+              price: product.price,
+              originalPrice: product.comparePrice,
+              rating: product.rating || (Math.random() * 1.5 + 3.5),
+              reviews: product.reviewCount || Math.floor(Math.random() * 2000) + 100,
+              image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/600x600?text=No+Image",
+              gallery: product.images?.map((img: any) => img.url) || [],
+              category: product.category?.name || "Uncategorized",
+              brand: product.vendor?.businessName || "Unknown Brand",
+              inStock: product.stock > 0,
+              badge,
+              description: product.description || "High-quality product with excellent features.",
+              features: product.features || ["Premium quality", "Fast shipping", "Warranty included"],
+              discount
+            };
+          });
+
+          setProducts(transformedProducts);
+          
+          // Check wishlist status for fetched products
+          checkWishlistStatus(transformedProducts);
+        }
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const handleAddToWishlist = async (product: FeaturedProduct) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to wishlist");
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      const isCurrentlyInWishlist = likedItems.has(product.id);
+      
+      if (isCurrentlyInWishlist) {
+        // Remove from wishlist
+        const response = await fetch("/api/routes/wishlist", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id,
+          },
+          body: JSON.stringify({
+            productId: product.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert("Product removed from wishlist!");
+          setLikedItems(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(product.id);
+            return newSet;
+          });
+        } else {
+          alert(data.message || "Failed to remove from wishlist");
+        }
+      } else {
+        // Add to wishlist
+        const response = await fetch("/api/routes/wishlist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id,
+          },
+          body: JSON.stringify({
+            productId: product.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert("Product added to wishlist!");
+          setLikedItems(prev => new Set([...prev, product.id]));
+        } else {
+          if (data.message === "Product already in wishlist") {
+            alert("Product is already in your wishlist!");
+            setLikedItems(prev => new Set([...prev, product.id]));
+          } else {
+            alert(data.message || "Failed to add to wishlist");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error managing wishlist:", error);
+      alert("Failed to update wishlist");
+    }
+  };
+
+  const handleAddToCart = async (product: FeaturedProduct) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to cart");
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          quantity: 1,
+          image: product.image,
+          brand: product.brand,
+          discount: product.discount,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Also add to local context for immediate UI update
+        addItem({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
+          brand: product.brand,
+          inStock: product.inStock,
+          discount: product.discount
+        });
+        alert("Added to cart successfully!");
+      } else {
+        alert(data.message || "Failed to add to cart");
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      alert("Failed to add to cart");
+    }
+  };
+
+  const handleViewProduct = (product: FeaturedProduct) => {
+    window.location.href = `/product/${product.id}`;
+  };
+
+  const filteredProducts = products.filter((product: FeaturedProduct) => {
     if (selectedBadge === "all") return true;
     return product.badge === selectedBadge;
   });
@@ -226,25 +446,7 @@ export default function FeaturedPage() {
           </p>
         </div>
 
-        {/* Badge Filter */}
-        <div className="mb-8">
-          <div className="flex flex-wrap justify-center gap-4">
-            {badges.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                onClick={() => setSelectedBadge(key)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all ${
-                  selectedBadge === key
-                    ? "bg-rose-600 text-white shadow-lg"
-                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+       
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 p-4 bg-white rounded-lg border border-gray-200">
@@ -255,18 +457,7 @@ export default function FeaturedPage() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-            >
-              <option value="rating">Highest Rated</option>
-              <option value="reviews">Most Reviews</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="name">Name A-Z</option>
-            </select>
+           
 
             {/* View Mode */}
             <div className="flex border border-gray-300 rounded-lg overflow-hidden">
@@ -295,9 +486,10 @@ export default function FeaturedPage() {
           {sortedProducts.map(product => (
             <div
               key={product.id}
-              className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 group ${
+              className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 group cursor-pointer ${
                 viewMode === "list" ? "flex" : ""
               }`}
+              onClick={() => handleViewProduct(product)}
             >
               <div className={`relative ${viewMode === "list" ? "w-80 flex-shrink-0" : ""}`}>
                 <img
@@ -323,7 +515,7 @@ export default function FeaturedPage() {
                 
                 {/* Like Button */}
                 <button
-                  onClick={() => toggleLike(product.id)}
+                  onClick={() => handleAddToWishlist(product)}
                   className={`absolute top-4 right-4 h-10 w-10 rounded-full backdrop-blur-sm flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 ${
                     likedItems.has(product.id) ? 'bg-rose-600 text-white' : 'bg-white/90 text-gray-400'
                   }`}
@@ -359,7 +551,7 @@ export default function FeaturedPage() {
                     ))}
                   </div>
                   <span className="text-sm font-medium text-gray-900">{product.rating}</span>
-                  <span className="text-sm text-gray-600">({product.reviews.toLocaleString()} reviews)</span>
+                 
                 </div>
                 
                 <p className="text-gray-600 mb-4 line-clamp-2">{product.description}</p>
@@ -391,13 +583,8 @@ export default function FeaturedPage() {
                 </div>
                 
                 <div className="flex gap-3">
-                  <button className="flex-1 bg-rose-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2">
-                    <ShoppingCart className="h-4 w-4" />
-                    Add to Cart
-                  </button>
-                  <button className="px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
-                    <Eye className="h-4 w-4" />
-                  </button>
+                 
+                 
                 </div>
               </div>
             </div>

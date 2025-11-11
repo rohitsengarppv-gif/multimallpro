@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Star, ShoppingCart } from "lucide-react";
+import { ArrowLeft, ArrowRight, Star, ShoppingCart, Loader2 } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 
 type Item = {
@@ -9,67 +9,129 @@ type Item = {
   price: number;
   img: string;
   rating: number;
+  brand: string;
+  inStock: boolean;
+  discount?: number;
 };
-
-const source: Item[] = Array.from({ length: 12 }).map((_, i) => ({
-  id: `carousel-${i + 1}`,
-  title: [
-    "Wireless Headphones",
-    "Portable Speaker",
-    "Smart Watch Series",
-    "Minimal Chair",
-    "Desk Lamp",
-    "Cotton Blanket",
-    "Ceramic Vase",
-    "Coffee Grinder",
-    "Bluetooth Keyboard",
-    "Noise-cancel Earbuds",
-    "Floor Lamp",
-    "Side Table",
-  ][i],
-  price: [79, 149, 299, 45, 189, 67, 234, 156, 89, 345, 123, 198][i],
-  img: [
-    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQZclwlEoZv1UpmF2bPWxnfN-_Ls-FvDYfHoQ&s",
-    "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=1200&auto=format&fit=crop",
-    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSK_j-gbGFRqwGAwhoXIIS_RLlEW78hIEu7GA&s",
-    "https://images.unsplash.com/photo-1501045661006-fcebe0257c3f?w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=1200&auto=format&fit=crop",
-    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTqDpDJR4Wl8U7us_TFYdkMJhfnZN3Pl_Thjg&s",
-    "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1517423440428-a5a00ad493e8?w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1503602642458-232111445657?w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1493666438817-866a91353ca9?w=1200&auto=format&fit=crop",
-  ][i],
-  rating: [4, 5, 3, 4, 5, 3, 4, 5, 4, 3, 5, 4][i],
-}));
 
 export default function ProductsCarousel() {
   const { addItem } = useCart();
+  const [products, setProducts] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   // Build duplicated list for seamless loop
-  const items = useMemo(() => [...source, ...source], []);
+  const items = useMemo(() => [...products, ...products], [products]);
 
-  const handleAddToCart = (item: Item) => {
-    addItem({
-      id: item.id,
-      name: item.title,
-      price: item.price,
-      image: item.img,
-      brand: "Recommended",
-      inStock: true
-    });
+  // Fetch 15 latest products from API
+  useEffect(() => {
+    const fetchLatestProducts = async () => {
+      try {
+        setLoading(true);
+        // Fetch products sorted by creation date (latest first)
+        const response = await fetch("/api/routes/products?active=true&limit=15&sort=createdAt&order=desc");
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          // Transform to Item format
+          const transformedProducts: Item[] = data.data.products.map((product: any) => ({
+            id: product._id,
+            title: product.name,
+            price: product.price,
+            img: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x300?text=No+Image",
+            rating: product.rating || Math.floor(Math.random() * 2) + 4, // 4-5 stars for latest products
+            brand: product.vendor?.businessName || "Latest",
+            inStock: product.stock > 0,
+            discount: product.comparePrice 
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : undefined
+          }));
+
+          setProducts(transformedProducts);
+        }
+      } catch (error) {
+        console.error("Error fetching latest products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLatestProducts();
+  }, []);
+
+  const handleAddToCart = async (item: Item) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to cart");
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify({
+          productId: item.id,
+          name: item.title,
+          price: item.price,
+          originalPrice: item.discount ? item.price * (1 + item.discount / 100) : undefined,
+          quantity: 1,
+          image: item.img,
+          brand: item.brand,
+          discount: item.discount,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Also add to local context for immediate UI update
+        addItem({
+          id: item.id,
+          name: item.title,
+          price: item.price,
+          image: item.img,
+          brand: item.brand,
+          inStock: item.inStock,
+          discount: item.discount
+        });
+      } else {
+        console.error("Failed to add to cart:", data.message);
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    }
   };
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900">Recommended For You</h3>
-       
+        <h3 className="text-xl font-bold text-gray-900">Latest Products</h3>
       </div>
 
-      <div className="group relative overflow-hidden">
-        <div className="flex gap-5 carousel-scroll">
-          {items.map((item, idx) => (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-rose-600 mx-auto mb-3" />
+            <p className="text-gray-600">Loading latest products...</p>
+          </div>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-gray-600">No products available</p>
+          </div>
+        </div>
+      ) : (
+        <div className="group relative overflow-hidden">
+          <div className="flex gap-5 carousel-scroll">
+            {items.map((item, idx) => (
             <article
               key={item.id + '-' + idx}
               className="basis-1/2 md:basis-1/3 lg:basis-1/5 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-all group"
@@ -98,19 +160,20 @@ export default function ProductsCarousel() {
           ))}
         </div>
 
-        <style jsx global>{`
-          @keyframes carousel-slide {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-          }
-          .carousel-scroll {
-            animation: carousel-slide 40s linear infinite;
-          }
-          .group:hover .carousel-scroll {
-            animation-play-state: paused;
-          }
-        `}</style>
-      </div>
+          <style jsx global>{`
+            @keyframes carousel-slide {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+            .carousel-scroll {
+              animation: carousel-slide 40s linear infinite;
+            }
+            .group:hover .carousel-scroll {
+              animation-play-state: paused;
+            }
+          `}</style>
+        </div>
+      )}
     </section>
   );
 }

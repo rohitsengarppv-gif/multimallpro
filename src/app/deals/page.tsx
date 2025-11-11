@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import { useCart } from "../../contexts/CartContext";
 import { 
   Zap, 
   Clock, 
@@ -14,7 +15,8 @@ import {
   Tag,
   Percent,
   Timer,
-  TrendingUp
+  TrendingUp,
+  Loader2
 } from "lucide-react";
 
 type Deal = {
@@ -35,138 +37,256 @@ type Deal = {
   available: number;
 };
 
-const deals: Deal[] = [
-  {
-    id: "1",
-    name: "Wireless Bluetooth Headphones Pro",
-    originalPrice: 199.99,
-    salePrice: 79.99,
-    discount: 60,
-    rating: 4.8,
-    reviews: 1250,
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "TechSound",
-    inStock: true,
-    timeLeft: "2h 15m",
-    dealType: "flash",
-    sold: 89,
-    available: 150
-  },
-  {
-    id: "2",
-    name: "Smart Fitness Watch Series X",
-    originalPrice: 299.99,
-    salePrice: 179.99,
-    discount: 40,
-    rating: 4.6,
-    reviews: 890,
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "FitTech",
-    inStock: true,
-    timeLeft: "1d 5h",
-    dealType: "daily",
-    sold: 156,
-    available: 200
-  },
-  {
-    id: "3",
-    name: "Premium Coffee Maker Deluxe",
-    originalPrice: 249.99,
-    salePrice: 149.99,
-    discount: 40,
-    rating: 4.7,
-    reviews: 567,
-    image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop",
-    category: "Kitchen",
-    brand: "BrewMaster",
-    inStock: true,
-    timeLeft: "3d 12h",
-    dealType: "weekly",
-    sold: 78,
-    available: 120
-  },
-  {
-    id: "4",
-    name: "Modern Office Chair Ergonomic",
-    originalPrice: 399.99,
-    salePrice: 199.99,
-    discount: 50,
-    rating: 4.5,
-    reviews: 432,
-    image: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400&h=400&fit=crop",
-    category: "Furniture",
-    brand: "ComfortPlus",
-    inStock: true,
-    timeLeft: "5d 8h",
-    dealType: "weekly",
-    sold: 45,
-    available: 80
-  },
-  {
-    id: "5",
-    name: "Designer Table Lamp LED",
-    originalPrice: 89.99,
-    salePrice: 39.99,
-    discount: 56,
-    rating: 4.3,
-    reviews: 234,
-    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&h=400&fit=crop",
-    category: "Home & Garden",
-    brand: "LightCraft",
-    inStock: false,
-    timeLeft: "Sold Out",
-    dealType: "clearance",
-    sold: 200,
-    available: 200
-  },
-  {
-    id: "6",
-    name: "Portable Bluetooth Speaker",
-    originalPrice: 129.99,
-    salePrice: 69.99,
-    discount: 46,
-    rating: 4.4,
-    reviews: 678,
-    image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "SoundWave",
-    inStock: true,
-    timeLeft: "6h 30m",
-    dealType: "flash",
-    sold: 123,
-    available: 180
-  }
-];
 
-const dealTypes = [
-  { key: "all", label: "All Deals", icon: Tag },
-  { key: "flash", label: "Flash Sale", icon: Zap },
-  { key: "daily", label: "Daily Deals", icon: Clock },
-  { key: "weekly", label: "Weekly Offers", icon: TrendingUp },
-  { key: "clearance", label: "Clearance", icon: Percent }
-];
+
 
 export default function DealsPage() {
+  const { addItem } = useCart();
   const [selectedDealType, setSelectedDealType] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("discount");
   const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleLike = (id: string) => {
-    setLikedItems(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+  // Check wishlist status for all products
+  const checkWishlistStatus = async (products: Deal[]) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) return;
+
+    try {
+      const user = JSON.parse(userData);
+      
+      const wishlistChecks = await Promise.all(
+        products.map(async (product) => {
+          try {
+            const response = await fetch(`/api/routes/wishlist?productId=${product.id}`, {
+              headers: {
+                "x-user-id": user.id,
+              },
+            });
+            const data = await response.json();
+            return {
+              productId: product.id,
+              inWishlist: data.success && data.data.inWishlist
+            };
+          } catch (error) {
+            return {
+              productId: product.id,
+              inWishlist: false
+            };
+          }
+        })
+      );
+
+      const wishlistedItems = new Set(
+        wishlistChecks
+          .filter(item => item.inWishlist)
+          .map(item => item.productId)
+      );
+      
+      setLikedItems(wishlistedItems);
+    } catch (error) {
+      console.error("Error checking wishlist status:", error);
+    }
   };
 
-  const filteredDeals = deals.filter(deal => {
+  // Fetch random products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/routes/products?active=true&limit=50");
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          // Get random products
+          const allProducts = data.data.products;
+          const shuffled = allProducts.sort(() => 0.5 - Math.random());
+          
+          // Transform to Deal format
+          const transformedDeals: Deal[] = shuffled.map((product: any) => {
+            const discount = product.comparePrice 
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : Math.floor(Math.random() * 40) + 10; // Random discount 10-50%
+            
+            // Assign random deal type based on discount
+            let dealType: "flash" | "daily" | "weekly" | "clearance";
+            if (discount >= 50) dealType = "flash";
+            else if (discount >= 40) dealType = "daily";
+            else if (discount >= 30) dealType = "weekly";
+            else dealType = "clearance";
+
+            // Calculate time left based on deal type
+            let timeLeft: string;
+            if (dealType === "flash") timeLeft = `${Math.floor(Math.random() * 6) + 1}h ${Math.floor(Math.random() * 60)}m`;
+            else if (dealType === "daily") timeLeft = `${Math.floor(Math.random() * 2) + 1}d ${Math.floor(Math.random() * 24)}h`;
+            else if (dealType === "weekly") timeLeft = `${Math.floor(Math.random() * 5) + 1}d ${Math.floor(Math.random() * 24)}h`;
+            else timeLeft = product.stock > 0 ? "Limited Stock" : "Sold Out";
+
+            return {
+              id: product._id,
+              name: product.name,
+              originalPrice: product.comparePrice || product.price * 1.5,
+              salePrice: product.price,
+              discount,
+              rating: product.rating || (Math.random() * 1.5 + 3.5),
+              reviews: product.reviewCount || Math.floor(Math.random() * 1000) + 100,
+              image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x400?text=No+Image",
+              category: product.category?.name || "Uncategorized",
+              brand: product.vendor?.businessName || "Unknown Brand",
+              inStock: product.stock > 0,
+              timeLeft,
+              dealType,
+              sold: Math.floor(Math.random() * 150) + 50,
+              available: product.stock
+            };
+          });
+
+          setDeals(transformedDeals);
+          
+          // Check wishlist status for fetched products
+          checkWishlistStatus(transformedDeals);
+        }
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        setDeals([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const handleAddToWishlist = async (deal: Deal) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to wishlist");
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      const isCurrentlyInWishlist = likedItems.has(deal.id);
+      
+      if (isCurrentlyInWishlist) {
+        // Remove from wishlist
+        const response = await fetch("/api/routes/wishlist", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id,
+          },
+          body: JSON.stringify({
+            productId: deal.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert("Product removed from wishlist!");
+          setLikedItems(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(deal.id);
+            return newSet;
+          });
+        } else {
+          alert(data.message || "Failed to remove from wishlist");
+        }
+      } else {
+        // Add to wishlist
+        const response = await fetch("/api/routes/wishlist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id,
+          },
+          body: JSON.stringify({
+            productId: deal.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert("Product added to wishlist!");
+          setLikedItems(prev => new Set([...prev, deal.id]));
+        } else {
+          if (data.message === "Product already in wishlist") {
+            alert("Product is already in your wishlist!");
+            setLikedItems(prev => new Set([...prev, deal.id]));
+          } else {
+            alert(data.message || "Failed to add to wishlist");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error managing wishlist:", error);
+      alert("Failed to update wishlist");
+    }
+  };
+
+  const handleAddToCart = async (deal: Deal) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to cart");
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify({
+          productId: deal.id,
+          name: deal.name,
+          price: deal.salePrice,
+          originalPrice: deal.originalPrice,
+          quantity: 1,
+          image: deal.image,
+          brand: deal.brand,
+          discount: deal.discount,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Also add to local context for immediate UI update
+        addItem({
+          id: deal.id,
+          name: deal.name,
+          price: deal.salePrice,
+          originalPrice: deal.originalPrice,
+          image: deal.image,
+          brand: deal.brand,
+          inStock: deal.inStock,
+          discount: deal.discount
+        });
+        alert("Added to cart successfully!");
+      } else {
+        alert(data.message || "Failed to add to cart");
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      alert("Failed to add to cart");
+    }
+  };
+
+  const handleViewProduct = (deal: Deal) => {
+    window.location.href = `/product/${deal.id}`;
+  };
+
+  const filteredDeals = deals.filter((deal: Deal) => {
     if (selectedDealType === "all") return true;
     return deal.dealType === selectedDealType;
   });
@@ -209,24 +329,7 @@ export default function DealsPage() {
         </div>
 
         {/* Deal Type Filter */}
-        <div className="mb-8">
-          <div className="flex flex-wrap justify-center gap-4">
-            {dealTypes.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                onClick={() => setSelectedDealType(key)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all ${
-                  selectedDealType === key
-                    ? "bg-rose-600 text-white shadow-lg"
-                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+       
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 p-4 bg-white rounded-lg border border-gray-200">
@@ -268,18 +371,36 @@ export default function DealsPage() {
           </div>
         </div>
 
-        {/* Deals Grid */}
-        <div className={`grid gap-6 ${
-          viewMode === "grid" 
-            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" 
-            : "grid-cols-1"
-        }`}>
-          {sortedDeals.map(deal => (
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-rose-600 mx-auto mb-4" />
+              <p className="text-gray-600">Loading amazing deals...</p>
+            </div>
+          </div>
+        ) : sortedDeals.length === 0 ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <Tag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No deals found</h3>
+              <p className="text-gray-600">Try selecting a different deal type</p>
+            </div>
+          </div>
+        ) : (
+          /* Deals Grid */
+          <div className={`grid gap-6 ${
+            viewMode === "grid" 
+              ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" 
+              : "grid-cols-1"
+          }`}>
+            {sortedDeals.map(deal => (
             <div
               key={deal.id}
-              className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 group ${
+              className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 group cursor-pointer ${
                 viewMode === "list" ? "flex" : ""
               }`}
+              onClick={() => handleViewProduct(deal)}
             >
               <div className={`relative ${viewMode === "list" ? "w-64 flex-shrink-0" : ""}`}>
                 <img
@@ -302,7 +423,10 @@ export default function DealsPage() {
                 
                 {/* Like Button */}
                 <button
-                  onClick={() => toggleLike(deal.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToWishlist(deal);
+                  }}
                   className={`absolute top-3 right-3 h-8 w-8 rounded-full backdrop-blur-sm flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 ${
                     likedItems.has(deal.id) ? 'bg-rose-600 text-white' : 'bg-white/90 text-gray-400'
                   }`}
@@ -310,13 +434,7 @@ export default function DealsPage() {
                   <Heart className={`h-4 w-4 ${likedItems.has(deal.id) ? 'fill-current' : ''}`} />
                 </button>
 
-                {!deal.inStock && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span className="bg-white text-gray-900 px-4 py-2 rounded-lg font-semibold">
-                      Sold Out
-                    </span>
-                  </div>
-                )}
+               
               </div>
               
               <div className="p-5 flex-1">
@@ -326,36 +444,19 @@ export default function DealsPage() {
                 
                 <p className="text-sm text-gray-600 mb-3">{deal.brand} • {deal.category}</p>
                 
-                <div className="flex items-center gap-1 mb-3">
-                  <div className="flex">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${
-                          i < Math.floor(deal.rating) 
-                            ? 'text-amber-400 fill-current' 
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-600">({deal.reviews})</span>
-                </div>
+              
                 
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl font-bold text-rose-600">${deal.salePrice}</span>
-                  <span className="text-lg text-gray-500 line-through">${deal.originalPrice}</span>
+                  <span className="text-2xl font-bold text-rose-600">₹{deal.salePrice}</span>
+                  <span className="text-lg text-gray-500 line-through">₹{deal.originalPrice}</span>
                   <span className="text-sm text-green-600 font-semibold">
-                    Save ${(deal.originalPrice - deal.salePrice).toFixed(2)}
+                    Save ₹{(deal.originalPrice - deal.salePrice).toFixed(2)}
                   </span>
                 </div>
 
                 {/* Progress Bar */}
                 <div className="mb-4">
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Sold: {deal.sold}</span>
-                    <span>Available: {deal.available}</span>
-                  </div>
+                  
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-gradient-to-r from-rose-500 to-pink-500 h-2 rounded-full transition-all duration-1000"
@@ -375,6 +476,10 @@ export default function DealsPage() {
                 )}
                 
                 <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToCart(deal);
+                  }}
                   disabled={!deal.inStock}
                   className="w-full bg-rose-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-rose-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
@@ -383,16 +488,7 @@ export default function DealsPage() {
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-
-        {sortedDeals.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-gray-400 mb-4">
-              <Tag className="h-16 w-16 mx-auto" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No deals found</h3>
-            <p className="text-gray-600">Try selecting a different deal type</p>
+            ))}
           </div>
         )}
 

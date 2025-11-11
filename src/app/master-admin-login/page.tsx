@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "../../components/Header";
@@ -25,6 +25,26 @@ export default function MasterAdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Initialize default master admin on page load
+  useEffect(() => {
+    const initializeMasterAdmin = async () => {
+      try {
+        const response = await fetch("/api/seed/master-admin", {
+          method: "POST",
+        });
+        const result = await response.json();
+        console.log("Master admin initialization:", result.message);
+      } catch (error) {
+        console.error("Failed to initialize master admin:", error);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeMasterAdmin();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -89,6 +109,16 @@ export default function MasterAdminLoginPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Master Admin Login</h1>
             <p className="text-gray-600">Access the master control panel</p>
           </div>
+
+          {/* Initialization Info */}
+          {isInitializing && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto mb-2"></div>
+              <p className="text-sm text-blue-700">Initializing system...</p>
+            </div>
+          )}
+
+         
 
           {/* Login Form */}
           <div className="bg-white rounded-xl shadow-lg p-8">

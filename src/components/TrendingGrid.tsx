@@ -1,116 +1,105 @@
 "use client";
-import { Heart, Eye, ShoppingCart } from "lucide-react";
-import { useState } from "react";
+import { Heart, Eye, ShoppingCart, Loader2, ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
 import ProductCard, { ProductCardData } from "./ProductCard";
 
-const products: ProductCardData[] = [
-  {
-    id: "p1",
-    name: "Tuvalu Solid Pine Pre-Slotted Slat Wooden Mahagany",
-    price: 269.00,
-    originalPrice: 359.00,
-    rating: 4.5,
-    reviews: 156,
-    image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=400&fit=crop",
-    brand: "WoodCraft",
-    category: "Furniture",
-    inStock: true,
-    discount: 25
-  },
-  {
-    id: "p2",
-    name: "Mediaeval Square Pillow Bag, Duck Blue, White",
-    price: 459.50,
-    originalPrice: 656.43,
-    rating: 4.3,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1523381294911-8d3cead13475?w=400&h=400&fit=crop",
-    brand: "HomeDecor",
-    category: "Home & Garden",
-    inStock: true,
-    discount: 30
-  },
-  {
-    id: "p3",
-    name: "Mediaeval Square Throw Pillow Bag, Dark Blue, White",
-    price: 569.00,
-    originalPrice: 669.00,
-    rating: 4.7,
-    reviews: 234,
-    image: "https://images.unsplash.com/photo-1501045661006-fcebe0257c3f?w=400&h=400&fit=crop",
-    brand: "ComfortPlus",
-    category: "Home & Garden",
-    inStock: true,
-    discount: 15
-  },
-  {
-    id: "p4",
-    name: "Mediaeval Square Throw Pillow Bag, Duck Blue, White",
-    price: 599.00,
-    originalPrice: 665.56,
-    rating: 4.2,
-    reviews: 178,
-    image: "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?w=400&h=400&fit=crop",
-    brand: "LuxuryHome",
-    category: "Home & Garden",
-    inStock: true,
-    discount: 10
-  },
-  {
-    id: "p5",
-    name: "Bulky Plaid Alternative Wicker Globe Bronze",
-    price: 499.00,
-    originalPrice: 665.33,
-    rating: 4.6,
-    reviews: 312,
-    image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=400&fit=crop",
-    brand: "ArtisanCraft",
-    category: "Home & Garden",
-    inStock: true,
-    discount: 25
-  },
-  {
-    id: "p6",
-    name: "Modern Square Throw Pillow Bag",
-    price: 399.00,
-    originalPrice: 499.00,
-    rating: 4.4,
-    reviews: 145,
-    image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=400&fit=crop",
-    brand: "ModernHome",
-    category: "Home & Garden",
-    inStock: true,
-    discount: 20
-  },
-  {
-    id: "p7",
-    name: "Wicker Globe Bronze Decor",
-    price: 299.00,
-    originalPrice: 399.00,
-    rating: 4.8,
-    reviews: 267,
-    image: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400&h=400&fit=crop",
-    brand: "DecorPlus",
-    category: "Furniture",
-    inStock: true,
-    discount: 25
-  },
-  {
-    id: "p8",
-    name: "Mediaeval Square Throw Pillow Bag, Duck Blue, White",
-    price: 599.00,
-    originalPrice: 731.71,
-    image: "https://images.unsplash.com/photo-1493666438817-866a91353ca9?w=600&h=600&fit=crop",
-    brand: "LuxuryHome",
-    category: "Home & Garden",
-    inStock: true,
-    rating: 4.2,
-    reviews: 178,
-    discount: 18
-  },
-];
+interface Category {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: {
+    url: string;
+    public_id: string;
+  };
+  status: string;
+}
 
 export default function TrendingGrid() {
+  const [products, setProducts] = useState<ProductCardData[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  // Fetch random products from API
+  useEffect(() => {
+    const fetchTrendingProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/routes/products?active=true&limit=30");
+        const data = await response.json();
+
+        if (data.success && data.data.products) {
+          // Get random 5 products for trending
+          const allProducts = data.data.products;
+          const shuffled = allProducts.sort(() => 0.5 - Math.random());
+          const selectedProducts = shuffled.slice(0, 5);
+
+          // Transform to ProductCardData format
+          const transformedProducts: ProductCardData[] = selectedProducts.map((product: any) => ({
+            id: product._id,
+            name: product.name,
+            price: product.price,
+            originalPrice: product.comparePrice,
+            rating: product.rating || 4.0,
+            reviews: product.reviewCount || 0,
+            image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x400?text=No+Image",
+            category: product.category?.name || "Uncategorized",
+            brand: product.vendor?.businessName || "Unknown Brand",
+            inStock: product.stock > 0,
+            discount: product.comparePrice 
+              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+              : undefined
+          }));
+
+          setProducts(transformedProducts);
+        }
+      } catch (error) {
+        console.error("Error fetching trending products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrendingProducts();
+  }, []);
+
+  // Fetch random categories
+  useEffect(() => {
+    const fetchRandomCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const response = await fetch("/api/routes/categories?role=admin&status=active&limit=20");
+        const result = await response.json();
+        
+        if (result.success) {
+          const categoriesData = Array.isArray(result.data)
+            ? result.data
+            : Array.isArray(result.data?.categories)
+            ? result.data.categories
+            : [];
+          
+          // Get random 6 categories
+          const shuffled = categoriesData.sort(() => 0.5 - Math.random());
+          const selectedCategories = shuffled.slice(0, 6);
+          
+          setCategories(selectedCategories);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchRandomCategories();
+  }, []);
+
+  const handleCategoryClick = (slug: string) => {
+    window.location.href = `/shop?category=${slug}`;
+  };
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 bg-gradient-to-b from-white to-gray-50">
       {/* Header row */}
@@ -121,21 +110,19 @@ export default function TrendingGrid() {
           </span>
         </div>
         <div className="hidden md:flex items-center gap-6 text-sm">
-          {[
-            "All",
-            "Furniture",
-            "Electronics",
-            "Fashion",
-            "Beauty",
-            "Food",
-          ].map((t, i) => (
+          <button 
+            onClick={() => window.location.href = '/categories'}
+            className="font-semibold transition-all duration-200 hover:text-rose-600 hover:scale-105 text-rose-600"
+          >
+            All
+          </button>
+          {categories.slice(0, 5).map((category) => (
             <button 
-              key={t} 
-              className={`font-semibold transition-all duration-200 hover:text-rose-600 hover:scale-105 ${
-                i === 0 ? "text-rose-600" : "text-gray-600"
-              }`}
+              key={category._id}
+              onClick={() => handleCategoryClick(category.slug)}
+              className="font-semibold transition-all duration-200 hover:text-rose-600 hover:scale-105 text-gray-600"
             >
-              {t}
+              {category.name}
             </button>
           ))}
         </div>
@@ -300,16 +287,39 @@ export default function TrendingGrid() {
       </div>
 
       {/* Products Grid - 5 products in 1 row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
-        {products.slice(0, 5).map((product, idx) => (
-          <div key={product.id} style={{animationDelay: `${idx * 0.05}s`}}>
-            <ProductCard
-              product={product}
-              className="animate-slideUp mobile-optimized"
-            />
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-rose-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading trending products...</p>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">No trending products available</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+          {products.map((product, idx) => (
+            <div key={product.id} style={{animationDelay: `${idx * 0.05}s`}}>
+              <ProductCard
+                product={product}
+                className="animate-slideUp mobile-optimized"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+  
 
       <style jsx>{`
         @keyframes fadeIn {

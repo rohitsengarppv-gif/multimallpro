@@ -26,7 +26,7 @@ export default function VendorBanner() {
                 <Store className="h-5 w-5" /> Become a Vendor
               </a>
               <a
-                href="#"
+                href="/shop"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 shadow-md"
               >
                 Explore now <ArrowRight className="h-4 w-4" />

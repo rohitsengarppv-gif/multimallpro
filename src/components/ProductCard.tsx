@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Star, Heart, ShoppingCart, GitCompare } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import Link from "next/link";
@@ -26,35 +26,147 @@ type ProductCardProps = {
 
 export default function ProductCard({ product, className = "" }: ProductCardProps) {
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
   const { addItem } = useCart();
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  // Check if product is in wishlist on component mount
+  useEffect(() => {
+    const checkWishlistStatus = async () => {
+      const userData = localStorage.getItem("user");
+      if (!userData) return;
+
+      try {
+        const user = JSON.parse(userData);
+        const response = await fetch(`/api/routes/wishlist?productId=${product.id}`, {
+          headers: {
+            "x-user-id": user.id,
+          },
+        });
+        const data = await response.json();
+        if (data.success && data.data.inWishlist) {
+          setIsWishlisted(true);
+        }
+      } catch (error) {
+        console.error("Error checking wishlist status:", error);
+      }
+    };
+
+    checkWishlistStatus();
+  }, [product.id]);
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation if card is wrapped in Link
     e.stopPropagation();
     
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      originalPrice: product.originalPrice,
-      image: product.image,
-      brand: product.brand,
-      inStock: product.inStock,
-      discount: product.discount
-    });
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to cart");
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          quantity: 1,
+          image: product.image,
+          brand: product.brand,
+          discount: product.discount,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Also add to local context for immediate UI update
+        addItem({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
+          brand: product.brand,
+          inStock: product.inStock,
+          discount: product.discount
+        });
+      } else {
+        console.error("Failed to add to cart:", data.message);
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    }
   };
 
-  const handleWishlistToggle = (e: React.MouseEvent) => {
+  const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
-  };
+    
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Please login to add items to wishlist");
+      window.location.href = "/auth/login";
+      return;
+    }
 
-  const handleCompare = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Add to compare - implement later
-    console.log("Add to compare:", product.id);
+    if (wishlistLoading) return;
+
+    try {
+      setWishlistLoading(true);
+      const user = JSON.parse(userData);
+      
+      if (isWishlisted) {
+        // Remove from wishlist
+        const response = await fetch("/api/routes/wishlist", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id,
+          },
+          body: JSON.stringify({
+            productId: product.id,
+          }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setIsWishlisted(false);
+        }
+      } else {
+        // Add to wishlist
+        const response = await fetch("/api/routes/wishlist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id,
+          },
+          body: JSON.stringify({
+            productId: product.id,
+          }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setIsWishlisted(true);
+        } else if (data.message === "Product already in wishlist") {
+          setIsWishlisted(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error managing wishlist:", error);
+    } finally {
+      setWishlistLoading(false);
+    }
   };
 
   return (
@@ -111,13 +223,7 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
             <ShoppingCart className="h-4 w-4" />
           </button>
           
-          <button
-            onClick={handleCompare}
-            className="h-9 w-9 rounded-full bg-white text-gray-600 hover:bg-purple-500 hover:text-white flex items-center justify-center transition-colors shadow-md"
-            title="Add to Compare"
-          >
-            <GitCompare className="h-4 w-4" />
-          </button>
+         
         </div>
       </div>
 

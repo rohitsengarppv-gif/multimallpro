@@ -6,10 +6,10 @@ import { config } from "../config/env";
 
 export interface IAdmin extends Document {
   // Personal Information
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
-  phone: string;
+  phone?: string;
   password: string;
   avatar?: {
     public_id: string;
@@ -17,8 +17,19 @@ export interface IAdmin extends Document {
   };
   
   // Admin Information
-  department: string;
-  role: "admin" | "master_admin";
+  name?: string;
+  department?: string;
+  role: "admin" | "master_admin" | "master";
+  permissions?: {
+    canManageAdmins?: boolean;
+    canManageVendors?: boolean;
+    canManageProducts?: boolean;
+    canManageOrders?: boolean;
+    canManageUsers?: boolean;
+    canManageSettings?: boolean;
+    canViewAnalytics?: boolean;
+    canManagePayments?: boolean;
+  };
   
   // Status and Verification
   status: "pending" | "approved" | "rejected";
@@ -40,13 +51,11 @@ const AdminSchema: Schema<IAdmin> = new Schema(
     // Personal Information
     firstName: {
       type: String,
-      required: [true, "Please add a first name"],
       trim: true,
       maxlength: [50, "First name can not be more than 50 characters"],
     },
     lastName: {
       type: String,
-      required: [true, "Please add a last name"],
       trim: true,
       maxlength: [50, "Last name can not be more than 50 characters"],
     },
@@ -63,7 +72,6 @@ const AdminSchema: Schema<IAdmin> = new Schema(
     },
     phone: {
       type: String,
-      required: [true, "Please add a phone number"],
       trim: true,
     },
     password: {
@@ -82,9 +90,12 @@ const AdminSchema: Schema<IAdmin> = new Schema(
     },
     
     // Admin Information
+    name: {
+      type: String,
+      trim: true,
+    },
     department: {
       type: String,
-      required: [true, "Please add a department"],
       enum: [
         "Operations",
         "Customer Support",
@@ -98,8 +109,18 @@ const AdminSchema: Schema<IAdmin> = new Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "master_admin"],
+      enum: ["admin", "master_admin", "master"],
       default: "admin",
+    },
+    permissions: {
+      canManageAdmins: { type: Boolean, default: false },
+      canManageVendors: { type: Boolean, default: false },
+      canManageProducts: { type: Boolean, default: false },
+      canManageOrders: { type: Boolean, default: false },
+      canManageUsers: { type: Boolean, default: false },
+      canManageSettings: { type: Boolean, default: false },
+      canViewAnalytics: { type: Boolean, default: false },
+      canManagePayments: { type: Boolean, default: false },
     },
     
     // Status and Verification
@@ -144,7 +165,7 @@ AdminSchema.methods.getSignedJwtToken = function (): string {
     expiresIn: expiresIn as any,
   };
 
-  return jwt.sign({ id: this._id.toString(), role: "admin" }, secret, options);
+  return jwt.sign({ id: this._id.toString(), role: this.role }, secret, options);
 };
 
 // Match admin entered password to hashed password in database

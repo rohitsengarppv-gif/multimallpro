@@ -7,11 +7,13 @@ import { useCart } from "../contexts/CartContext";
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
-  const [wishlistCount, setWishlistCount] = useState(5);
+  const [wishlistCount, setWishlistCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const [isClient, setIsClient] = useState(false);
+  const [websiteSettings, setWebsiteSettings] = useState<any>(null);
   const { isOpen: cartOpen, openCart, closeCart, getTotalItems } = useCart();
   const contextCartCount = getTotalItems();
 
@@ -24,8 +26,40 @@ export default function Header() {
     window.location.href = "/";
   };
 
-  // Check authentication status
+  // Fetch cart count from API
+  const fetchCartCount = async (userId: string) => {
+    try {
+      const response = await fetch("/api/cart", {
+        headers: { "x-user-id": userId },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCartCount(data.data.totalItems || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching cart count:", error);
+    }
+  };
+
+  // Fetch wishlist count from API
+  const fetchWishlistCount = async (userId: string) => {
+    try {
+      const response = await fetch("/api/routes/wishlist/count?userId=" + userId, {
+        headers: { "x-user-id": userId },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setWishlistCount(data.data.count || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching wishlist count:", error);
+    }
+  };
+
+  // Check authentication status (only on client side)
   useEffect(() => {
+    setIsClient(true);
+    
     const checkAuth = () => {
       const token = localStorage.getItem("token");
       const userData = localStorage.getItem("user");
@@ -37,6 +71,8 @@ export default function Header() {
           setIsLoggedIn(true);
           // Fetch cart count when user is logged in
           fetchCartCount(parsedUser.id);
+          // Fetch wishlist count when user is logged in
+          fetchWishlistCount(parsedUser.id);
         } catch (error) {
           console.error("Error parsing user data:", error);
           setIsLoggedIn(false);
@@ -53,20 +89,35 @@ export default function Header() {
     return () => window.removeEventListener("storage", checkAuth);
   }, []);
 
-  // Fetch cart count from API
-  const fetchCartCount = async (userId: string) => {
-    try {
-      const response = await fetch("/api/cart", {
-        headers: { "x-user-id": userId },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCartCount(data.data.totalItems || 0);
+  // Fetch website settings on component mount
+  useEffect(() => {
+    const fetchWebsiteSettings = async () => {
+      try {
+        const response = await fetch("/api/routes/home-settings");
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          setWebsiteSettings(data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching website settings:", error);
+        // Continue with default values
       }
-    } catch (error) {
-      console.error("Error fetching cart count:", error);
+    };
+
+    fetchWebsiteSettings();
+  }, []);
+
+  // Update favicon when website settings change
+  useEffect(() => {
+    if (websiteSettings?.favicon?.url) {
+      const link = document.querySelector("link[rel='icon']") || document.createElement('link');
+      link.setAttribute('rel', 'icon');
+      link.setAttribute('href', websiteSettings.favicon.url);
+      link.setAttribute('type', 'image/x-icon');
+      document.head.appendChild(link);
     }
-  };
+  }, [websiteSettings?.favicon?.url]);
 
   // Refresh cart count when cart sidebar closes
   useEffect(() => {
@@ -92,29 +143,39 @@ export default function Header() {
         <div className="mx-auto max-w-7xl px-4 py-2.5 flex items-center justify-between gap-4">
           <p className="text-white/90 truncate flex items-center gap-2">
             <Zap className="h-3.5 w-3.5 text-yellow-400 animate-pulse" />
-            <span>Welcome to <span className="font-bold text-rose-400">E-market</span>! Enjoy mega offers, 0% piracy, and pay on delivery. New Coupon code: <span className="font-bold text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded">Happy2025</span></span>
+            <span>
+              {websiteSettings?.announcement?.enabled && websiteSettings?.announcement?.message
+                ? websiteSettings.announcement.message
+                : `Welcome to ${websiteSettings?.name || 'E-market'}! Enjoy mega offers, 0% piracy, and pay on delivery.`
+              }
+              {websiteSettings?.announcement?.link && (
+                <a 
+                  href={websiteSettings.announcement.link} 
+                  className="font-bold text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded ml-2 hover:bg-yellow-400/20 transition-colors"
+                >
+                  Learn More
+                </a>
+              )}
+            </span>
           </p>
           <div className="flex items-center gap-4 text-white/80">
-           
             <span className="text-white/20">|</span>
             <a href="/orders" className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5" />
               <span>Track Order</span>
             </a>
             <span className="text-white/20">|</span>
-            <a href="tel:+1800123456" className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1.5">
-              <Phone className="h-3.5 w-3.5" />
-              <span>(+1) 800 123 456</span>
-            </a>
-            <span className="text-white/20">|</span>
+            {websiteSettings?.supportPhone && (
+              <>
+                <a href={`tel:${websiteSettings.supportPhone}`} className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5" />
+                  <span>{websiteSettings.supportPhone}</span>
+                </a>
+                <span className="text-white/20">|</span>
+              </>
+            )}
             <div className="flex items-center gap-2">
-              <button className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1">
-                English 
-              </button>
-              <span className="text-white/30">/</span>
-              <button className="hover:text-rose-400 transition-colors duration-200 flex items-center gap-1">
-                USD 
-              </button>
+              
             </div>
           </div>
         </div>
@@ -126,13 +187,17 @@ export default function Header() {
       }`}>
         {/* Logo */}
         <a href="/" className="flex items-center gap-2.5 shrink-0 group">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 grid place-items-center text-white font-black text-xl shadow-lg group-hover:scale-110 transition-transform duration-200">
-            e
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-black tracking-tight group-hover:text-rose-400 transition-colors duration-200">market</span>
-            <span className="text-[9px] text-white/60 uppercase tracking-widest -mt-1">Shop Smart</span>
-          </div>
+          {websiteSettings?.logo?.url ? (
+            <img
+              src={websiteSettings.logo.url}
+              alt=""
+              className="h-24 w-24 rounded-xl object-cover shadow-lg group-hover:scale-110 transition-transform duration-200"
+            />
+          ) : (
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 grid place-items-center text-white font-black text-xl shadow-lg group-hover:scale-110 transition-transform duration-200">
+              {websiteSettings?.name?.charAt(0).toUpperCase() || 'e'}
+            </div>
+          )}
         </a>
 
         {/* Desktop Menu */}
@@ -163,13 +228,16 @@ export default function Header() {
 
         {/* Desktop Icons */}
         <div className="hidden md:flex items-center gap-2">
-          <IconButton icon={<GitCompare className="h-5 w-5" />} label="Compare" href="/compare" />
+         
           <IconButton icon={<Heart className="h-5 w-5" />} label="Wishlist" count={wishlistCount} href="/wishlist" />
           <CartButton count={cartCount} onClick={openCart} />
 
           {/* Auth Buttons / User Profile */}
           <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/20">
-            {isLoggedIn && user ? (
+            {!isClient ? (
+              // Loading state during hydration
+              <div className="w-8 h-8 bg-white/20 animate-pulse rounded-lg"></div>
+            ) : isLoggedIn && user ? (
               <a
                 href="/profile"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
@@ -243,14 +311,7 @@ export default function Header() {
             BECOME VENDOR
           </a>
 
-          {/* Offers Button */}
-          <a 
-            href="/offers"
-            className="hidden md:flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold hover:from-orange-600 hover:to-red-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 group"
-          >
-            <Tag className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
-            <span>Offers</span>
-          </a>
+         
 
           {/* Search Input */}
           <div className="flex flex-1 bg-white items-center overflow-hidden rounded-xl shadow-lg group hover:shadow-xl transition-all duration-200">

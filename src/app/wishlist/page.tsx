@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import { useCart } from "../../contexts/CartContext";
 import { 
   Heart, 
   ShoppingCart, 
@@ -9,115 +11,111 @@ import {
   Star,
   Plus,
   Minus,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 
 type WishlistItem = {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  rating: number;
-  reviews: number;
-  image: string;
-  category: string;
-  brand: string;
-  inStock: boolean;
-  discount?: number;
-  dateAdded: string;
+  _id: string;
+  userId: string;
+  productId: {
+    _id: string;
+    name: string;
+    price: number;
+    comparePrice?: number;
+    mainImage?: { url: string };
+    images?: { url: string }[];
+    stock: number;
+    rating?: number;
+    reviewCount?: number;
+    category?: { name: string };
+    vendor?: { businessName: string };
+  };
+  addedAt: string;
 };
 
-const wishlistItems: WishlistItem[] = [
-  {
-    id: "1",
-    name: "Wireless Bluetooth Headphones",
-    price: 89.99,
-    originalPrice: 129.99,
-    rating: 4.5,
-    reviews: 234,
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "TechSound",
-    inStock: true,
-    discount: 31,
-    dateAdded: "2024-11-01"
-  },
-  {
-    id: "2", 
-    name: "Modern Office Chair",
-    price: 299.00,
-    originalPrice: 399.00,
-    rating: 4.8,
-    reviews: 156,
-    image: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400&h=400&fit=crop",
-    category: "Furniture",
-    brand: "ComfortPlus",
-    inStock: true,
-    discount: 25,
-    dateAdded: "2024-10-28"
-  },
-  {
-    id: "3",
-    name: "Designer Table Lamp",
-    price: 65.50,
-    rating: 4.2,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&h=400&fit=crop",
-    category: "Home & Garden",
-    brand: "LightCraft",
-    inStock: true,
-    dateAdded: "2024-10-25"
-  },
-  {
-    id: "4",
-    name: "Premium Coffee Maker",
-    price: 199.99,
-    originalPrice: 249.99,
-    rating: 4.7,
-    reviews: 312,
-    image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop",
-    category: "Kitchen",
-    brand: "BrewMaster",
-    inStock: false,
-    discount: 20,
-    dateAdded: "2024-10-20"
-  },
-  {
-    id: "5",
-    name: "Smart Fitness Watch",
-    price: 249.00,
-    originalPrice: 299.00,
-    rating: 4.6,
-    reviews: 445,
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-    category: "Electronics",
-    brand: "FitTech",
-    inStock: true,
-    discount: 17,
-    dateAdded: "2024-10-15"
-  }
-];
-
 export default function WishlistPage() {
-  const [items, setItems] = useState<WishlistItem[]>(wishlistItems);
+  const router = useRouter();
+  const { addItem } = useCart();
+  const [items, setItems] = useState<WishlistItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
-  const removeItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
-    setSelectedItems(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
+  // Check authentication and fetch wishlist
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    const token = localStorage.getItem("token");
+    
+    if (!userData || !token) {
+      router.push("/auth/login");
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      fetchWishlist(parsedUser.id);
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      router.push("/auth/login");
+    }
+  }, [router]);
+
+  const fetchWishlist = async (userId: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/routes/wishlist", {
+        headers: {
+          "x-user-id": userId,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setItems(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching wishlist:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleSelectItem = (id: string) => {
+  const removeItem = async (productId: string) => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch("/api/routes/wishlist", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify({ productId }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setItems(prev => prev.filter(item => item.productId._id !== productId));
+        setSelectedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.error("Error removing from wishlist:", error);
+    }
+  };
+
+  const toggleSelectItem = (productId: string) => {
     setSelectedItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
       } else {
-        newSet.add(id);
+        newSet.add(productId);
       }
       return newSet;
     });
@@ -127,25 +125,148 @@ export default function WishlistPage() {
     if (selectedItems.size === items.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(items.map(item => item.id)));
+      setSelectedItems(new Set(items.map(item => item.productId._id)));
     }
   };
 
-  const removeSelected = () => {
-    setItems(prev => prev.filter(item => !selectedItems.has(item.id)));
-    setSelectedItems(new Set());
+  const removeSelected = async () => {
+    if (!user) return;
+    
+    const selectedProductIds = Array.from(selectedItems);
+    
+    try {
+      // Remove each selected item
+      await Promise.all(
+        selectedProductIds.map(productId =>
+          fetch("/api/routes/wishlist", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": user.id,
+            },
+            body: JSON.stringify({ productId }),
+          })
+        )
+      );
+      
+      setItems(prev => prev.filter(item => !selectedItems.has(item.productId._id)));
+      setSelectedItems(new Set());
+    } catch (error) {
+      console.error("Error removing selected items:", error);
+    }
   };
 
-  const addSelectedToCart = () => {
-    const selectedProducts = items.filter(item => selectedItems.has(item.id) && item.inStock);
-    console.log("Adding to cart:", selectedProducts);
-    // Add to cart logic here
+  const addSelectedToCart = async () => {
+    if (!user) return;
+    
+    const selectedProducts = items.filter(item => 
+      selectedItems.has(item.productId._id) && item.productId.stock > 0
+    );
+    
+    try {
+      // Add each selected item to cart
+      await Promise.all(
+        selectedProducts.map(item =>
+          fetch("/api/cart", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": user.id,
+            },
+            body: JSON.stringify({
+              productId: item.productId._id,
+              name: item.productId.name,
+              price: item.productId.price,
+              originalPrice: item.productId.comparePrice,
+              quantity: 1,
+              image: item.productId.mainImage?.url || item.productId.images?.[0]?.url || "https://via.placeholder.com/400",
+              brand: item.productId.vendor?.businessName || "Unknown",
+              discount: item.productId.comparePrice 
+                ? Math.round(((item.productId.comparePrice - item.productId.price) / item.productId.comparePrice) * 100)
+                : undefined,
+            }),
+          })
+        )
+      );
+      
+      // Also add to local cart context
+      selectedProducts.forEach(item => {
+        addItem({
+          id: item.productId._id,
+          name: item.productId.name,
+          price: item.productId.price,
+          originalPrice: item.productId.comparePrice,
+          image: item.productId.mainImage?.url || item.productId.images?.[0]?.url || "https://via.placeholder.com/400",
+          brand: item.productId.vendor?.businessName || "Unknown",
+          inStock: item.productId.stock > 0,
+          discount: item.productId.comparePrice 
+            ? Math.round(((item.productId.comparePrice - item.productId.price) / item.productId.comparePrice) * 100)
+            : undefined,
+        });
+      });
+      
+      alert(`${selectedProducts.length} items added to cart!`);
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    }
   };
 
-  const totalValue = items.reduce((sum, item) => sum + item.price, 0);
+  const addSingleItemToCart = async (item: WishlistItem) => {
+    if (!user) return;
+    
+    try {
+      // Add to cart via API
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+        },
+        body: JSON.stringify({
+          productId: item.productId._id,
+          name: item.productId.name,
+          price: item.productId.price,
+          originalPrice: item.productId.comparePrice,
+          quantity: 1,
+          image: item.productId.mainImage?.url || item.productId.images?.[0]?.url || "https://via.placeholder.com/400",
+          brand: item.productId.vendor?.businessName || "Unknown",
+          discount: item.productId.comparePrice 
+            ? Math.round(((item.productId.comparePrice - item.productId.price) / item.productId.comparePrice) * 100)
+            : undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Also add to local cart context for immediate UI update
+        addItem({
+          id: item.productId._id,
+          name: item.productId.name,
+          price: item.productId.price,
+          originalPrice: item.productId.comparePrice,
+          image: item.productId.mainImage?.url || item.productId.images?.[0]?.url || "https://via.placeholder.com/400",
+          brand: item.productId.vendor?.businessName || "Unknown",
+          inStock: item.productId.stock > 0,
+          discount: item.productId.comparePrice 
+            ? Math.round(((item.productId.comparePrice - item.productId.price) / item.productId.comparePrice) * 100)
+            : undefined,
+        });
+        
+        alert("Item added to cart!");
+      } else {
+        alert("Failed to add item to cart");
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      alert("Failed to add item to cart");
+    }
+  };
+
+  const totalValue = items.reduce((sum, item) => sum + item.productId.price, 0);
   const selectedValue = items
-    .filter(item => selectedItems.has(item.id))
-    .reduce((sum, item) => sum + item.price, 0);
+    .filter(item => selectedItems.has(item.productId._id))
+    .reduce((sum, item) => sum + item.productId.price, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -158,7 +279,14 @@ export default function WishlistPage() {
           <p className="text-gray-600">Save items for later and never lose track of what you love</p>
         </div>
 
-        {items.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-rose-600 mx-auto mb-4" />
+              <p className="text-gray-600">Loading your wishlist...</p>
+            </div>
+          </div>
+        ) : items.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-gray-400 mb-6">
               <Heart className="h-24 w-24 mx-auto" />
@@ -185,12 +313,12 @@ export default function WishlistPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Value</p>
-                    <p className="text-2xl font-bold text-rose-600">${totalValue.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-rose-600">₹{totalValue.toFixed(2)}</p>
                   </div>
                   {selectedItems.size > 0 && (
                     <div>
                       <p className="text-sm text-gray-600">Selected Value</p>
-                      <p className="text-2xl font-bold text-green-600">${selectedValue.toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-green-600">₹{selectedValue.toFixed(2)}</p>
                     </div>
                   )}
                 </div>
@@ -230,7 +358,7 @@ export default function WishlistPage() {
             <div className="grid gap-6">
               {items.map(item => (
                 <div
-                  key={item.id}
+                  key={item.productId._id}
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300"
                 >
                   <div className="flex flex-col sm:flex-row">
@@ -238,21 +366,21 @@ export default function WishlistPage() {
                     <div className="relative sm:w-48 flex-shrink-0">
                       <input
                         type="checkbox"
-                        checked={selectedItems.has(item.id)}
-                        onChange={() => toggleSelectItem(item.id)}
+                        checked={selectedItems.has(item.productId._id)}
+                        onChange={() => toggleSelectItem(item.productId._id)}
                         className="absolute top-3 left-3 z-10 h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500"
                       />
                       <img
-                        src={item.image}
-                        alt={item.name}
+                        src={item.productId.mainImage?.url || item.productId.images?.[0]?.url}
+                        alt={item.productId.name}
                         className="w-full h-48 sm:h-full object-cover"
                       />
-                      {item.discount && (
+                      {item.productId.comparePrice && (
                         <div className="absolute top-3 right-3 bg-rose-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
-                          -{item.discount}%
+                          -{Math.round(((item.productId.comparePrice - item.productId.price) / item.productId.comparePrice) * 100)}%
                         </div>
                       )}
-                      {!item.inStock && (
+                      {item.productId.stock <= 0 && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                           <span className="bg-white text-gray-900 px-3 py-1 rounded-lg font-semibold text-sm">
                             Out of Stock
@@ -266,10 +394,10 @@ export default function WishlistPage() {
                       <div className="flex flex-col lg:flex-row lg:items-start justify-between h-full">
                         <div className="flex-1 mb-4 lg:mb-0">
                           <div className="flex items-start justify-between mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 pr-4">{item.name}</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 pr-4">{item.productId.name}</h3>
                           </div>
                           
-                          <p className="text-sm text-gray-600 mb-2">{item.brand} • {item.category}</p>
+                          <p className="text-sm text-gray-600 mb-2">{item.productId.vendor?.businessName || 'Unknown Brand'} • {item.productId.category?.name || 'Uncategorized'}</p>
                           
                           <div className="flex items-center gap-1 mb-3">
                             <div className="flex">
@@ -277,38 +405,39 @@ export default function WishlistPage() {
                                 <Star
                                   key={i}
                                   className={`h-4 w-4 ${
-                                    i < Math.floor(item.rating) 
+                                    i < Math.floor(item.productId.rating || 0) 
                                       ? 'text-amber-400 fill-current' 
                                       : 'text-gray-300'
                                   }`}
                                 />
                               ))}
                             </div>
-                            <span className="text-sm text-gray-600">({item.reviews})</span>
+                            <span className="text-sm text-gray-600">({item.productId.reviewCount || 0})</span>
                           </div>
                           
                           <div className="flex items-center gap-2 mb-3">
-                            <span className="text-xl font-bold text-gray-900">${item.price}</span>
-                            {item.originalPrice && (
-                              <span className="text-sm text-gray-500 line-through">${item.originalPrice}</span>
+                            <span className="text-xl font-bold text-gray-900">₹{item.productId.price}</span>
+                            {item.productId.comparePrice && (
+                              <span className="text-sm text-gray-500 line-through">₹{item.productId.comparePrice}</span>
                             )}
                           </div>
                           
-                          <p className="text-xs text-gray-500">Added on {item.dateAdded}</p>
+                          <p className="text-xs text-gray-500">Added on {new Date(item.addedAt).toLocaleDateString()}</p>
                         </div>
                         
                         {/* Actions */}
                         <div className="flex flex-col gap-3 lg:ml-6">
                           <button
-                            disabled={!item.inStock}
+                            onClick={() => addSingleItemToCart(item)}
+                            disabled={item.productId.stock <= 0}
                             className="w-full lg:w-auto px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                           >
                             <ShoppingCart className="h-4 w-4" />
-                            {item.inStock ? "Add to Cart" : "Out of Stock"}
+                            {item.productId.stock > 0 ? "Add to Cart" : "Out of Stock"}
                           </button>
                           
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.productId._id)}
                             className="w-full lg:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                           >
                             <Trash2 className="h-4 w-4" />

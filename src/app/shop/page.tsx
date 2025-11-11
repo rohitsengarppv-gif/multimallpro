@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard, { ProductCardData } from "../../components/ProductCard";
@@ -25,7 +26,8 @@ const priceRanges = [
   { label: "₹200+", min: 200, max: Infinity }
 ];
 
-export default function ShopPage() {
+function ShopContent() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<ProductCardData[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [brands, setBrands] = useState<string[]>(["All"]);
@@ -43,6 +45,45 @@ export default function ShopPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
+
+  // Read URL parameters and fetch category name from API
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    const subcategoryParam = searchParams.get('subcategory');
+    
+    console.log("URL params - category:", categoryParam, "subcategory:", subcategoryParam);
+    
+    if (categoryParam) {
+      // Fetch the actual category from API using the slug
+      const fetchCategoryBySlug = async () => {
+        try {
+          const response = await fetch(`/api/routes/categories?role=admin`);
+          const result = await response.json();
+          
+          if (result.success && result.data) {
+            const categories = Array.isArray(result.data) ? result.data : result.data.categories || [];
+            const matchedCategory = categories.find((cat: any) => cat.slug === categoryParam);
+            
+            if (matchedCategory) {
+              console.log("Found category:", matchedCategory.name);
+              setSelectedCategory(matchedCategory.name);
+            } else {
+              console.log("Category not found for slug:", categoryParam);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching category:", error);
+        }
+      };
+      
+      fetchCategoryBySlug();
+    }
+    
+    if (subcategoryParam) {
+      console.log("Subcategory from URL:", subcategoryParam);
+      // You can add subcategory filtering logic here if needed
+    }
+  }, [searchParams]);
 
   // Fetch products from API
   useEffect(() => {
@@ -319,10 +360,27 @@ export default function ShopPage() {
               <>
                 {/* Toolbar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 p-4 bg-white rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-600">
-                      {sortedProducts.length} products found • Showing {startIndex + 1}-{Math.min(endIndex, sortedProducts.length)} of {sortedProducts.length}
-                    </span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-gray-600">
+                        {sortedProducts.length} products found • Showing {startIndex + 1}-{Math.min(endIndex, sortedProducts.length)} of {sortedProducts.length}
+                      </span>
+                    </div>
+                    {/* Active Filter Badge */}
+                    {selectedCategory !== "All" && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Active Filter:</span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs font-medium rounded-full">
+                          {selectedCategory}
+                          <button
+                            onClick={() => setSelectedCategory("All")}
+                            className="ml-1 hover:bg-white/20 rounded-full p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      </div>
+                    )}
                   </div>
               
               <div className="flex items-center gap-4">
@@ -443,5 +501,21 @@ export default function ShopPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-12 w-12 animate-spin text-rose-600" />
+        </div>
+        <Footer />
+      </div>
+    }>
+      <ShopContent />
+    </Suspense>
   );
 }

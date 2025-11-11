@@ -36,7 +36,7 @@ export default function Footer() {
               <li><Link href="/offers" className="hover:text-rose-600">Offers</Link></li>
               <li><Link href="/contact" className="hover:text-rose-600">Contact</Link></li>
               <li><Link href="/become-vendor" className="hover:text-orange-600 font-semibold text-orange-600">🏪 Become Vendor</Link></li>
-              <li><Link href="/admin-dashboard" className="hover:text-purple-600">Admin Dashboard</Link></li>
+             
             </ul>
           </div>
 
@@ -47,8 +47,7 @@ export default function Footer() {
               <li><Link href="/returns-refunds" className="hover:text-rose-600">Returns & Refunds</Link></li>
               <li><Link href="/orders" className="hover:text-rose-600">Track Orders</Link></li>
               <li><Link href="/contact" className="hover:text-rose-600">Help Center</Link></li>
-              <li><a href="#" className="hover:text-rose-600">Shipping Info</a></li>
-              <li><a href="#" className="hover:text-rose-600">Size Guide</a></li>
+             
             </ul>
           </div>
 

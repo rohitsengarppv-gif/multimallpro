@@ -26,6 +26,7 @@ import {
   User,
   LogOut,
   ChevronDown,
+  Image,
 } from "lucide-react";
 
 import CustomDashboardPage from "../../components/admin/CustomDashboardPage";
@@ -110,6 +111,13 @@ export default function AdminDashboard() {
     }
   }, [adminData]);
 
+  // Handle navigation to external pages
+  useEffect(() => {
+    if (activeTab === "hero-banners") {
+      router.push("/admin/hero-banners");
+    }
+  }, [activeTab, router]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -149,7 +157,7 @@ export default function AdminDashboard() {
   }
 
   const primaryItems = [
-    { id: "custom-dashboard", label: "Overview", icon: LayoutDashboard },
+   
     { id: "user-details", label: "User Detail", icon: BarChartBig },
     ...(adminData?.role === "master_admin" ? [{ id: "admin-management", label: "Admin Management", icon: Shield }] : []),
     { id: "admin-profile", label: "Profile", icon: User },
@@ -163,11 +171,12 @@ export default function AdminDashboard() {
     { id: "admin-subcategories", label: "Subcategories", icon: Grid3X3 },
     { id: "admin-discounts", label: "Discounts", icon: Percent },
     { id: "vendors", label: "Vendors", icon: Store },
+    { id: "hero-banners", label: "Hero Banners", icon: Image },
   ];
 
   const supportItems = [
     { id: "help-management", label: "Help Management", icon: HelpCircle },
-    { id: "messages", label: "Messages", icon: MessageSquare },
+    
    
   ];
 
@@ -264,6 +273,15 @@ export default function AdminDashboard() {
         return <AdminSubCategoriesPage />;
       case "admin-discounts":
         return <AdminDiscountsPage />;
+      case "hero-banners":
+        return (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Redirecting to Hero Banners...</p>
+            </div>
+          </div>
+        );
       case "help-management":
         return <HelpManagementPage />;
       
