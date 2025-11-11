@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Discount from "@/app/api/models/Discount";
-import User from "@/app/api/models/User";
-import Product from "@/app/api/models/Product";
-import Category from "@/app/api/models/Category";
+
 import connectDB from "@/app/api/config/mongoose";
 
 // Get all discounts for a vendor
@@ -29,6 +27,7 @@ export const getDiscounts = async (req: NextRequest) => {
     const skip = (page - 1) * limit;
 
     const discounts = await Discount.find(query)
+      .populate('vendor', 'businessName email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -37,14 +36,12 @@ export const getDiscounts = async (req: NextRequest) => {
 
     return NextResponse.json({
       success: true,
-      data: {
-        discounts,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit),
-        },
+      data: discounts,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
     });
   } catch (error: any) {

@@ -237,31 +237,7 @@ export default function VendorManagementPage() {
           <h1 className="text-2xl font-bold text-gray-900">Vendor Management</h1>
           <p className="text-gray-600 mt-1">Approve storefronts, monitor performance, and take actions.</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingVendor(null);
-            setFormData({
-              businessName: "",
-              firstName: "",
-              lastName: "",
-              email: "",
-              phone: "",
-              businessType: "",
-              businessAddress: "",
-              city: "",
-              state: "",
-              businessDescription: "",
-              productCategories: [],
-              website: "",
-              status: "pending"
-            });
-            setShowModal(true);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Vendor
-        </button>
+       
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -311,32 +287,11 @@ export default function VendorManagementPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="pending">Pending</option>
-              <option value="suspended">Suspended</option>
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {categoryOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option === "all" ? "All Categories" : option}
-                </option>
-              ))}
-            </select>
-          </div>
+          
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -417,14 +372,7 @@ export default function VendorManagementPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(vendor)}
-                          disabled={actionLoading === vendor._id}
-                          className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
-                          title="Edit vendor"
-                        >
-                          <Edit className="h-4 w-4 text-gray-500" />
-                        </button>
+                        
                         <button
                           onClick={() => deleteVendor(vendor._id)}
                           disabled={actionLoading === vendor._id}
@@ -442,14 +390,113 @@ export default function VendorManagementPage() {
           </table>
         </div>
 
-        {filteredVendors.length === 0 && !loading && (
-          <div className="text-center py-10 text-gray-500 text-sm">
-            {searchTerm || statusFilter !== "all" || categoryFilter !== "all"
-              ? "No vendors match the current filters."
-              : "No vendor applications yet."
-            }
-          </div>
-        )}
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400 mr-2" />
+              <span className="text-gray-500">Loading vendors...</span>
+            </div>
+          ) : filteredVendors.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <Building className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="font-medium">
+                {searchTerm || statusFilter !== "all" || categoryFilter !== "all"
+                  ? "No vendors match the current filters."
+                  : "No vendor applications yet."
+                }
+              </p>
+            </div>
+          ) : (
+            filteredVendors.map((vendor: VendorAccount) => (
+              <div key={vendor._id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900">{vendor.businessName}</h3>
+                    <p className="text-sm text-gray-600 mt-1">{vendor.firstName} {vendor.lastName}</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge[vendor.status]}`}>
+                    {vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1)}
+                  </span>
+                </div>
+
+                <div className="space-y-2 mb-3 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Mail className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{vendor.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <PhoneCall className="h-4 w-4 flex-shrink-0" />
+                    <span>{vendor.phone}</span>
+                  </div>
+                  {vendor.businessAddress && (
+                    <div className="flex items-start gap-2 text-gray-600">
+                      <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs">{vendor.businessAddress}, {vendor.city}, {vendor.state}</span>
+                    </div>
+                  )}
+                </div>
+
+                {vendor.productCategories && vendor.productCategories.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-500 mb-1">Categories:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {vendor.productCategories.map((cat, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full">
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                  <span className="text-xs text-gray-500">
+                    Joined {new Date(vendor.createdAt).toLocaleDateString()}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {vendor.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => updateVendorStatus(vendor._id, 'approved')}
+                          disabled={actionLoading === vendor._id}
+                          className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 font-medium"
+                        >
+                          {actionLoading === vendor._id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Approve'}
+                        </button>
+                        <button
+                          onClick={() => updateVendorStatus(vendor._id, 'rejected')}
+                          disabled={actionLoading === vendor._id}
+                          className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 font-medium"
+                        >
+                          {actionLoading === vendor._id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Reject'}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleEdit(vendor)}
+                      disabled={actionLoading === vendor._id}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      <Edit className="h-4 w-4 text-gray-600" />
+                    </button>
+                    <button
+                      onClick={() => deleteVendor(vendor._id)}
+                      disabled={actionLoading === vendor._id}
+                      className="p-2 rounded-lg bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      {actionLoading === vendor._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {showModal && (

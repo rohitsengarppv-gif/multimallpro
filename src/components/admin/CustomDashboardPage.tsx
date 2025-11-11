@@ -28,7 +28,8 @@ interface StatCard {
 }
 
 interface Product {
-  id: string;
+  id?: string;
+  _id?: string;
   name: string;
   category: string;
   sales: number;
@@ -110,6 +111,7 @@ export default function CustomDashboardPage() {
     role?: string;
   }[]>([]);
   const [allCategories, setAllCategories] = useState<any[]>([]);
+  const [allSubcategories, setAllSubcategories] = useState<any[]>([]);
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
   const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "active" | "inactive" | "vendor" | "system">("all");
@@ -123,19 +125,21 @@ export default function CustomDashboardPage() {
     setIsLoading(true);
     try {
       // Fetch all data in parallel
-      const [usersRes, vendorsRes, ordersRes, categoriesRes] = await Promise.all([
+      const [usersRes, vendorsRes, ordersRes, categoriesRes, subcategoriesRes] = await Promise.all([
         fetch('/api/routes/users'),
         fetch('/api/vendors'),
         fetch('/api/routes/orders?limit=1000'),  // Fetch more orders for accurate stats
-        fetch('/api/routes/categories?limit=5000')  // Fetch ALL categories (vendor + system)
+        fetch('/api/routes/categories?role=admin&limit=5000'),  // Fetch ALL categories (vendor + system)
+        fetch('/api/routes/subcategories?role=admin&limit=5000')  // Fetch ALL subcategories
       ]);
 
       const usersData = await usersRes.json();
       const vendorsData = await vendorsRes.json();
       const ordersData = ordersRes.ok ? await ordersRes.json() : { success: false, data: { orders: [] } };
       const categoriesApiData = await categoriesRes.json();
+      const subcategoriesApiData = await subcategoriesRes.json();
 
-      console.log('API Response Data:', { usersData, vendorsData, ordersData, categoriesApiData });
+      console.log('API Response Data:', { usersData, vendorsData, ordersData, categoriesApiData, subcategoriesApiData });
 
       // Calculate stats - ensure all are arrays
       const users = Array.isArray(usersData.data) ? usersData.data : (Array.isArray(usersData) ? usersData : []);
@@ -151,11 +155,18 @@ export default function CustomDashboardPage() {
         ? categoriesApiData.data 
         : (Array.isArray(categoriesApiData) ? categoriesApiData : []);
       
-      // Store all categories for modal
+      // Subcategories API returns data array
+      const apiSubcategories = Array.isArray(subcategoriesApiData.data) 
+        ? subcategoriesApiData.data 
+        : (Array.isArray(subcategoriesApiData) ? subcategoriesApiData : []);
+      
+      // Store all categories and subcategories
       setAllCategories(apiCategories);
+      setAllSubcategories(apiSubcategories);
       
       console.log('Categories from API:', apiCategories.length);
-      console.log('Processed Arrays:', { users: users.length, vendors: vendors.length, orders: orders.length, categories: apiCategories.length });
+      console.log('Subcategories from API:', apiSubcategories.length);
+      console.log('Processed Arrays:', { users: users.length, vendors: vendors.length, orders: orders.length, categories: apiCategories.length, subcategories: apiSubcategories.length });
 
       // Total customers (users with role 'user')
       const totalCustomers = users.filter((u: any) => u.role === 'user').length;
@@ -703,8 +714,8 @@ export default function CustomDashboardPage() {
             <Package className="h-5 w-5 text-blue-600" />
           </div>
           <div className="space-y-3">
-            {trendingProducts.map((product) => (
-              <div key={product.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
+            {trendingProducts.map((product, index) => (
+              <div key={product.id || product._id || `product-${index}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex-1">
                   <p className="font-semibold text-gray-900 text-sm">{product.name}</p>
                   <p className="text-xs text-gray-500">{product.category}</p>
@@ -751,6 +762,121 @@ export default function CustomDashboardPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Categories & Subcategories Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Categories Overview */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Categories</h2>
+              <p className="text-sm text-gray-500">Product categories overview</p>
+            </div>
+            <Package className="h-5 w-5 text-purple-600" />
+          </div>
+          <div className="space-y-3">
+            {allCategories.slice(0, 5).map((category: any, index: number) => (
+              <div key={category._id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {category.image?.url ? (
+                    <img src={category.image.url} alt={category.name} className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                      <Package className="h-5 w-5 text-purple-600" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{category.name || category.title}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {category.vendor?.businessName || (category.isDefault ? 'System' : 'N/A')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    category.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {category.status || 'active'}
+                  </span>
+                  {category.subcategories && category.subcategories.length > 0 && (
+                    <span className="text-xs text-gray-500">{category.subcategories.length} subs</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {allCategories.length > 5 && (
+            <button
+              onClick={() => setShowCategoriesModal(true)}
+              className="w-full mt-4 px-4 py-2 text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+            >
+              View All {allCategories.length} Categories
+            </button>
+          )}
+          {allCategories.length === 0 && (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No categories found</p>
+            </div>
+          )}
+        </div>
+
+        {/* Subcategories Overview */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Subcategories</h2>
+              <p className="text-sm text-gray-500">Latest subcategories</p>
+            </div>
+            <Package className="h-5 w-5 text-indigo-600" />
+          </div>
+          <div className="space-y-3">
+            {allSubcategories.length > 0 ? (
+              <>
+                {allSubcategories.slice(0, 5).map((sub: any, index: number) => (
+                  <div key={sub._id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {sub.image?.url ? (
+                        <img src={sub.image.url} alt={sub.name} className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                          <Package className="h-5 w-5 text-indigo-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm truncate">{sub.name || 'Unnamed'}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          Parent: {sub.parentCategory?.name || 'N/A'}
+                        </p>
+                        {sub.vendor?.businessName && (
+                          <p className="text-xs text-purple-600 truncate">
+                            Vendor: {sub.vendor.businessName}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      sub.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {sub.status || 'active'}
+                    </span>
+                  </div>
+                ))}
+                {allSubcategories.length > 5 && (
+                  <div className="text-center pt-2">
+                    <p className="text-xs text-gray-500">+{allSubcategories.length - 5} more subcategories</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No subcategories found</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

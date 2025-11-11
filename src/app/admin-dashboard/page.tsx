@@ -31,10 +31,23 @@ import {
 import CustomDashboardPage from "../../components/admin/CustomDashboardPage";
 import UserManagementPage from "../../components/admin/UserManagementPage";
 import VendorManagementPage from "../../components/admin/VendorManagementPage";
-import AdvancedAnalyticsPage from "../../components/admin/AdvancedAnalyticsPage";
+import UserDetailPage from "../../components/admin/UserDetailPage";
 import AdminManagementPage from "../../components/master/AdminManagementPage";
 import AdminProfilePage from "../../components/admin/AdminProfilePage";
+import WebsiteSettingsPage from "../../components/admin/WebsiteSettingsPage";
 
+// New Admin Pages
+import AdminProductsPage from "../../components/admin/ProductsPage";
+import AdminProductDetailPage from "../../components/admin/ProductDetailPage";
+import AdminOrdersPage from "../../components/admin/OrdersPage";
+import AdminOrderDetailPage from "../../components/admin/OrderDetailPage";
+import AdminCustomersPage from "../../components/admin/CustomersPage";
+import AdminCategoriesPage from "../../components/admin/CategoriesManagementPage";
+import AdminSubCategoriesPage from "../../components/admin/SubCategoriesPage";
+import AdminDiscountsPage from "../../components/admin/DiscountsPage";
+import HelpManagementPage from "../../components/admin/HelpManagementPage";
+
+// Vendor Pages (keeping for backward compatibility)
 import ProductsPage from "../../components/vendor/ProductsPage";
 import ProductFormPage from "../../components/vendor/ProductFormPage";
 import OrdersPage from "../../components/vendor/OrdersPage";
@@ -44,7 +57,6 @@ import InvoicePage from "../../components/vendor/InvoicePage";
 import AnalyticsPage from "../../components/vendor/AnalyticsPage";
 import CustomersPage from "../../components/vendor/CustomersPage";
 import SettingsPage from "../../components/vendor/SettingsPage";
-import WebsiteSettingsPage from "../../components/admin/WebsiteSettingsPage";
 import SecurityPage from "../../components/vendor/SecurityPage";
 import HelpPage from "../../components/vendor/HelpPage";
 import MessagesPage from "../../components/vendor/MessagesPage";
@@ -54,6 +66,9 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("custom-dashboard");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserType, setSelectedUserType] = useState<"customer" | "vendor">("customer");
   const [adminData, setAdminData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -86,6 +101,14 @@ export default function AdminDashboard() {
       return;
     }
   }, [router]);
+
+  useEffect(() => {
+    if (adminData?._id) {
+      setSelectedUserId(adminData._id);
+      const role = adminData.role === "vendor" ? "vendor" : "customer";
+      setSelectedUserType(role);
+    }
+  }, [adminData]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -127,27 +150,25 @@ export default function AdminDashboard() {
 
   const primaryItems = [
     { id: "custom-dashboard", label: "Overview", icon: LayoutDashboard },
-    { id: "users", label: "Users", icon: Users },
+    { id: "user-details", label: "User Detail", icon: BarChartBig },
     ...(adminData?.role === "master_admin" ? [{ id: "admin-management", label: "Admin Management", icon: Shield }] : []),
     { id: "admin-profile", label: "Profile", icon: User },
-  
-    { id: "website-settings", label: "Website Settings", icon: Filter },
-   
+    { id: "website-settings", label: "Website Settings", icon: Settings },
   ];
 
   const managementItems = [
-    { id: "products", label: "Products", icon: Package },
-    { id: "orders", label: "Orders", icon: ShoppingCart },
-    { id: "discount", label: "Discounts", icon: Percent },
-    { id: "integrations", label: "Integrations", icon: Grid3X3 },
-    
+    { id: "admin-products", label: "Products", icon: Package },
+    { id: "admin-orders", label: "Orders", icon: ShoppingCart },
+    { id: "admin-categories", label: "Categories", icon: Grid3X3 },
+    { id: "admin-subcategories", label: "Subcategories", icon: Grid3X3 },
+    { id: "admin-discounts", label: "Discounts", icon: Percent },
+    { id: "vendors", label: "Vendors", icon: Store },
   ];
 
   const supportItems = [
-    { id: "customers", label: "Customers", icon: Users },
+    { id: "help-management", label: "Help Management", icon: HelpCircle },
     { id: "messages", label: "Messages", icon: MessageSquare },
-    { id: "security", label: "Security", icon: Shield },
-    { id: "help", label: "Help Center", icon: HelpCircle },
+   
   ];
 
   const renderContent = () => {
@@ -162,8 +183,91 @@ export default function AdminDashboard() {
         return <AdminManagementPage />;
       case "admin-profile":
         return <AdminProfilePage />;
-      case "advanced-analytics":
-        return <AdvancedAnalyticsPage />;
+      case "user-details":
+        if (!selectedUserId) {
+          return (
+            <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <p className="text-gray-600">No user selected. Please choose a user from the Users tab.</p>
+              <button
+                onClick={() => setActiveTab("users")}
+                className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Go to Users
+              </button>
+            </div>
+          );
+        }
+        return (
+          <UserDetailPage
+            userId={selectedUserId}
+            userType={selectedUserType}
+            onBack={() => setActiveTab("users")}
+          />
+        );
+      case "website-settings":
+        return <WebsiteSettingsPage />;
+      
+      // New Admin Pages
+      case "admin-products":
+        return (
+          <AdminProductsPage
+            onViewProduct={(productId: string) => {
+              setSelectedProductId(productId);
+              setActiveTab("admin-product-detail");
+            }}
+          />
+        );
+      case "admin-product-detail":
+        return selectedProductId ? (
+          <AdminProductDetailPage 
+            productId={selectedProductId}
+            onBack={() => {
+              setSelectedProductId(null);
+              setActiveTab("admin-products");
+            }}
+          />
+        ) : (
+          <AdminProductsPage onViewProduct={(productId: string) => {
+            setSelectedProductId(productId);
+            setActiveTab("admin-product-detail");
+          }} />
+        );
+      case "admin-orders":
+        return (
+          <AdminOrdersPage
+            onViewOrder={(orderId: string) => {
+              setSelectedOrderId(orderId);
+              setActiveTab("admin-order-detail");
+            }}
+          />
+        );
+      case "admin-order-detail":
+        return selectedOrderId ? (
+          <AdminOrderDetailPage 
+            orderId={selectedOrderId}
+            onBack={() => {
+              setSelectedOrderId(null);
+              setActiveTab("admin-orders");
+            }}
+          />
+        ) : (
+          <AdminOrdersPage onViewOrder={(orderId: string) => {
+            setSelectedOrderId(orderId);
+            setActiveTab("admin-order-detail");
+          }} />
+        );
+      case "admin-customers":
+        return <AdminCustomersPage />;
+      case "admin-categories":
+        return <AdminCategoriesPage />;
+      case "admin-subcategories":
+        return <AdminSubCategoriesPage />;
+      case "admin-discounts":
+        return <AdminDiscountsPage />;
+      case "help-management":
+        return <HelpManagementPage />;
+      
+      // Old vendor pages (keeping for backward compatibility)
       case "products":
         return (
           <ProductsPage
@@ -199,8 +303,6 @@ export default function AdminDashboard() {
         return <HelpPage />;
       case "settings":
         return <SettingsPage />;
-      case "website-settings":
-        return <WebsiteSettingsPage />;
       case "product-form":
         return (
           <ProductFormPage

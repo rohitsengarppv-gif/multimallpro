@@ -1,123 +1,100 @@
-import { useState } from "react";
-import { Search, Book, MessageCircle, Mail, Phone, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Book, MessageCircle, Mail, Phone, ExternalLink, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+
+interface HelpContent {
+  _id: string;
+  type: "faq" | "quickLink" | "contact" | "category";
+  question?: string;
+  answer?: string;
+  category?: string;
+  title?: string;
+  description?: string;
+  link?: string;
+  icon?: string;
+  method?: string;
+  contact?: string;
+  available?: string;
+  categoryId?: string;
+  categoryName?: string;
+  status: string;
+  sortOrder: number;
+}
 
 export default function HelpPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [categories, setCategories] = useState([{ id: "all", name: "All Topics" }]);
+  const [faqs, setFaqs] = useState<HelpContent[]>([]);
+  const [quickLinks, setQuickLinks] = useState<HelpContent[]>([]);
+  const [contactOptions, setContactOptions] = useState<HelpContent[]>([]);
 
-  const categories = [
-    { id: "all", name: "All Topics" },
-    { id: "getting-started", name: "Getting Started" },
-    { id: "products", name: "Products" },
-    { id: "orders", name: "Orders" },
-    { id: "payments", name: "Payments" },
-    { id: "shipping", name: "Shipping" },
-    { id: "account", name: "Account" }
-  ];
+  useEffect(() => {
+    fetchHelpContent();
+  }, []);
 
-  const faqs = [
-    {
-      id: 1,
-      question: "How do I add my first product?",
-      answer: "To add your first product, go to the Products page and click 'Add Product'. Fill in the product details including name, description, price, and upload images. Make sure to set your inventory levels and publish when ready.",
-      category: "getting-started"
-    },
-    {
-      id: 2,
-      question: "How do I process orders?",
-      answer: "Orders appear in your Orders dashboard. You can view order details, update status, print shipping labels, and communicate with customers directly from the order management page.",
-      category: "orders"
-    },
-    {
-      id: 3,
-      question: "What payment methods are supported?",
-      answer: "We support major payment processors including PayPal, Stripe, and direct bank transfers. You can configure your preferred payment methods in the Integrations section.",
-      category: "payments"
-    },
-    {
-      id: 4,
-      question: "How do I set up shipping rates?",
-      answer: "Shipping rates can be configured in your Store Settings. You can set flat rates, weight-based pricing, or integrate with shipping carriers like FedEx and UPS for real-time rates.",
-      category: "shipping"
-    },
-    {
-      id: 5,
-      question: "Can I customize my store appearance?",
-      answer: "Yes! You can customize your store's appearance through the Settings page. Upload your logo, choose colors, and configure your store information to match your brand.",
-      category: "account"
-    },
-    {
-      id: 6,
-      question: "How do I manage inventory?",
-      answer: "Inventory is managed at the product level. You can set stock quantities, low stock alerts, and track inventory changes in the Products section. The system automatically updates inventory when orders are placed.",
-      category: "products"
-    },
-    {
-      id: 7,
-      question: "What analytics are available?",
-      answer: "The Analytics dashboard provides insights into sales performance, customer behavior, popular products, and revenue trends. You can view data by different time periods and export reports.",
-      category: "getting-started"
-    },
-    {
-      id: 8,
-      question: "How do I handle returns and refunds?",
-      answer: "Returns can be processed through the Orders page. You can issue partial or full refunds, update order status, and communicate with customers about return procedures.",
-      category: "orders"
+  const fetchHelpContent = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/routes/help-content?status=active');
+      const data = await response.json();
+
+      if (data.success) {
+        const content = data.data || [];
+        
+        // Separate content by type
+        const faqContent = content.filter((item: HelpContent) => item.type === 'faq');
+        const quickLinkContent = content.filter((item: HelpContent) => item.type === 'quickLink');
+        const contactContent = content.filter((item: HelpContent) => item.type === 'contact');
+        const categoryContent = content.filter((item: HelpContent) => item.type === 'category');
+
+        setFaqs(faqContent);
+        setQuickLinks(quickLinkContent);
+        setContactOptions(contactContent);
+        
+        // Build categories list
+        const cats = [{ id: "all", name: "All Topics" }];
+        categoryContent.forEach((cat: HelpContent) => {
+          if (cat.categoryId && cat.categoryName) {
+            cats.push({ id: cat.categoryId, name: cat.categoryName });
+          }
+        });
+        setCategories(cats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch help content:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
-
-  const quickLinks = [
-    {
-      title: "Video Tutorials",
-      description: "Step-by-step video guides",
-      icon: <Book className="h-5 w-5" />,
-      link: "#"
-    },
-    {
-      title: "Community Forum",
-      description: "Connect with other vendors",
-      icon: <MessageCircle className="h-5 w-5" />,
-      link: "#"
-    },
-    {
-      title: "API Documentation",
-      description: "Technical integration guides",
-      icon: <ExternalLink className="h-5 w-5" />,
-      link: "#"
-    }
-  ];
-
-  const contactOptions = [
-    {
-      method: "Email Support",
-      description: "Get help via email within 24 hours",
-      contact: "support@salesai.com",
-      icon: <Mail className="h-5 w-5 text-blue-600" />,
-      available: "24/7"
-    },
-    {
-      method: "Phone Support",
-      description: "Speak with our support team",
-      contact: "+1 (555) 123-4567",
-      icon: <Phone className="h-5 w-5 text-green-600" />,
-      available: "Mon-Fri 9AM-6PM EST"
-    },
-    {
-      method: "Live Chat",
-      description: "Instant help from our team",
-      contact: "Available in dashboard",
-      icon: <MessageCircle className="h-5 w-5 text-purple-600" />,
-      available: "Mon-Fri 9AM-6PM EST"
-    }
-  ];
+  };
 
   const filteredFaqs = faqs.filter(faq => {
-    const matchesSearch = faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         faq.answer.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = faq.question?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         faq.answer?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = activeCategory === "all" || faq.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const getIconComponent = (iconName?: string) => {
+    const icons: any = {
+      Book: <Book className="h-5 w-5" />,
+      MessageCircle: <MessageCircle className="h-5 w-5" />,
+      ExternalLink: <ExternalLink className="h-5 w-5" />,
+      Mail: <Mail className="h-5 w-5 text-blue-600" />,
+      Phone: <Phone className="h-5 w-5 text-green-600" />,
+    };
+    return icons[iconName || 'Book'] || <Book className="h-5 w-5" />;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -144,27 +121,29 @@ export default function HelpPage() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {quickLinks.map((link, index) => (
-          <a
-            key={index}
-            href={link.link}
-            className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
-                {link.icon}
+      {quickLinks.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {quickLinks.map((link) => (
+            <a
+              key={link._id}
+              href={link.link || "#"}
+              className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
+                  {getIconComponent(link.icon)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">
+                    {link.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">{link.description}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">
-                  {link.title}
-                </h3>
-                <p className="text-sm text-gray-600">{link.description}</p>
-              </div>
-            </div>
-          </a>
-        ))}
-      </div>
+            </a>
+          ))}
+        </div>
+      )}
 
       {/* FAQ Section */}
       <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
@@ -190,19 +169,19 @@ export default function HelpPage() {
         {/* FAQ List */}
         <div className="space-y-4">
           {filteredFaqs.map((faq) => (
-            <div key={faq.id} className="border border-gray-200 rounded-lg">
+            <div key={faq._id} className="border border-gray-200 rounded-lg">
               <button
-                onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
+                onClick={() => setExpandedFaq(expandedFaq === faq._id ? null : faq._id)}
                 className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
                 <span className="font-medium text-gray-900">{faq.question}</span>
-                {expandedFaq === faq.id ? (
+                {expandedFaq === faq._id ? (
                   <ChevronDown className="h-5 w-5 text-gray-400" />
                 ) : (
                   <ChevronRight className="h-5 w-5 text-gray-400" />
                 )}
               </button>
-              {expandedFaq === faq.id && (
+              {expandedFaq === faq._id && (
                 <div className="px-6 pb-4">
                   <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
                 </div>
@@ -221,27 +200,29 @@ export default function HelpPage() {
       </div>
 
       {/* Contact Support */}
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Support</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {contactOptions.map((option, index) => (
-            <div key={index} className="text-center p-6 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors">
-              <div className="flex justify-center mb-4">
-                <div className="p-3 bg-gray-100 rounded-full">
-                  {option.icon}
+      {contactOptions.length > 0 && (
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Support</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {contactOptions.map((option) => (
+              <div key={option._id} className="text-center p-6 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors">
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-gray-100 rounded-full">
+                    {getIconComponent(option.icon)}
+                  </div>
                 </div>
+                <h3 className="font-semibold text-gray-900 mb-2">{option.method}</h3>
+                <p className="text-sm text-gray-600 mb-3">{option.description}</p>
+                <p className="font-medium text-gray-900 mb-2">{option.contact}</p>
+                <p className="text-xs text-gray-500">{option.available}</p>
+                <button className="mt-4 w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors">
+                  Contact Now
+                </button>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">{option.method}</h3>
-              <p className="text-sm text-gray-600 mb-3">{option.description}</p>
-              <p className="font-medium text-gray-900 mb-2">{option.contact}</p>
-              <p className="text-xs text-gray-500">{option.available}</p>
-              <button className="mt-4 w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors">
-                Contact Now
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* System Status */}
       <div className="bg-green-50 rounded-xl p-6 border border-green-200">

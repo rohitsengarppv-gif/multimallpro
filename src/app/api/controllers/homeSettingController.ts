@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import HomeSetting from "@/app/api/models/HomeSetting";
 import connectDB from "@/app/api/config/mongoose";
+import { deleteFromCloudinary } from "@/app/api/utils/cloudinary";
 
 // GET /api/routes/home-settings - Get home settings (single document)
 export const getHomeSettings = async (req: NextRequest) => {
@@ -119,13 +120,33 @@ export const updateHomeSettings = async (req: NextRequest) => {
       },
     };
 
-    // Update logo if provided
+    // Update logo if provided and delete old one from Cloudinary
     if (logo && logo.url) {
+      // Delete old logo from Cloudinary if it exists and is different
+      if (settings?.logo?.public_id && settings.logo.public_id !== logo.public_id) {
+        try {
+          await deleteFromCloudinary(settings.logo.public_id);
+          console.log('Old logo deleted from Cloudinary:', settings.logo.public_id);
+        } catch (error) {
+          console.error('Failed to delete old logo from Cloudinary:', error);
+          // Continue even if deletion fails
+        }
+      }
       updateData.logo = logo;
     }
 
-    // Update favicon if provided
+    // Update favicon if provided and delete old one from Cloudinary
     if (favicon && favicon.url) {
+      // Delete old favicon from Cloudinary if it exists and is different
+      if (settings?.favicon?.public_id && settings.favicon.public_id !== favicon.public_id) {
+        try {
+          await deleteFromCloudinary(settings.favicon.public_id);
+          console.log('Old favicon deleted from Cloudinary:', settings.favicon.public_id);
+        } catch (error) {
+          console.error('Failed to delete old favicon from Cloudinary:', error);
+          // Continue even if deletion fails
+        }
+      }
       updateData.favicon = favicon;
     }
 

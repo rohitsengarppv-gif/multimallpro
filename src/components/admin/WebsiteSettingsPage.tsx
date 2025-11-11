@@ -42,6 +42,8 @@ export default function WebsiteSettingsPage() {
   const [showLogoPreview, setShowLogoPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingFavicon, setIsUploadingFavicon] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // Fetch settings on component mount
@@ -74,7 +76,7 @@ export default function WebsiteSettingsPage() {
     setTimeout(() => setMessage(null), 5000);
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, key: "logo" | "favicon") => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, key: "logo" | "favicon") => {
     const file = event.target.files?.[0];
     if (!file) return;
     
@@ -90,18 +92,51 @@ export default function WebsiteSettingsPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (result) => {
-      const url = typeof result.target?.result === "string" ? result.target.result : "";
-      setDraft((prev) => ({ 
-        ...prev, 
-        [key]: { 
-          url,
-          public_id: '' 
-        } 
-      }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Set uploading state
+      if (key === 'logo') {
+        setIsUploadingLogo(true);
+      } else {
+        setIsUploadingFavicon(true);
+      }
+
+      // Create FormData for upload
+      const formData = new FormData();
+      formData.append('files', file);
+      formData.append('folder', 'home-settings');
+
+      // Upload to Cloudinary via API
+      const response = await fetch('/api/routes/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.length > 0) {
+        const uploadedImage = data.data[0];
+        setDraft((prev) => ({ 
+          ...prev, 
+          [key]: { 
+            url: uploadedImage.secure_url || uploadedImage.url,
+            public_id: uploadedImage.public_id 
+          } 
+        }));
+        showMessage('success', `${key === 'logo' ? 'Logo' : 'Favicon'} uploaded successfully!`);
+      } else {
+        showMessage('error', data.message || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      showMessage('error', 'Failed to upload image');
+    } finally {
+      // Reset uploading state
+      if (key === 'logo') {
+        setIsUploadingLogo(false);
+      } else {
+        setIsUploadingFavicon(false);
+      }
+    }
   };
 
   const handleReset = () => {
@@ -298,8 +333,15 @@ export default function WebsiteSettingsPage() {
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 cursor-pointer hover:border-purple-500 text-sm text-gray-500 transition-colors">
-                  {draft.logo?.url ? (
+                <label className={`flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 text-sm text-gray-500 transition-colors ${
+                  isUploadingLogo ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-purple-500'
+                }`}>
+                  {isUploadingLogo ? (
+                    <>
+                      <Loader2 className="h-8 w-8 text-purple-600 animate-spin" />
+                      <span className="mt-2 text-purple-600 font-medium">Uploading...</span>
+                    </>
+                  ) : draft.logo?.url ? (
                     <img src={draft.logo.url} alt="Logo preview" className="h-20 object-contain" />
                   ) : (
                     <>
@@ -312,10 +354,11 @@ export default function WebsiteSettingsPage() {
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={isUploadingLogo}
                     onChange={(event) => handleImageUpload(event, "logo")}
                   />
                 </label>
-                {draft.logo?.url && (
+                {draft.logo?.url && !isUploadingLogo && (
                   <button
                     onClick={() => setShowLogoPreview(true)}
                     className="mt-2 text-xs text-purple-600 hover:underline flex items-center gap-1"
@@ -326,8 +369,15 @@ export default function WebsiteSettingsPage() {
               </div>
               <div className="w-36">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Favicon</label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 cursor-pointer hover:border-purple-500 text-sm text-gray-500 transition-colors">
-                  {draft.favicon?.url ? (
+                <label className={`flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 text-sm text-gray-500 transition-colors ${
+                  isUploadingFavicon ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-purple-500'
+                }`}>
+                  {isUploadingFavicon ? (
+                    <>
+                      <Loader2 className="h-8 w-8 text-purple-600 animate-spin" />
+                      <span className="mt-2 text-purple-600 font-medium text-[11px]">Uploading...</span>
+                    </>
+                  ) : draft.favicon?.url ? (
                     <img src={draft.favicon.url} alt="Favicon preview" className="h-12 object-contain" />
                   ) : (
                     <>
@@ -340,6 +390,7 @@ export default function WebsiteSettingsPage() {
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={isUploadingFavicon}
                     onChange={(event) => handleImageUpload(event, "favicon")}
                   />
                 </label>

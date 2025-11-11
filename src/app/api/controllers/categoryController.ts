@@ -11,12 +11,17 @@ export const getCategories = async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
     const vendorId = searchParams.get("vendorId");
     const role = searchParams.get("role") || "vendor";
-    const status = searchParams.get("status") || "active";
+    const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
 
-    let query: any = { status };
+    let query: any = {};
+
+    // Only filter by status if explicitly provided
+    if (status) {
+      query.status = status;
+    }
 
     // Filter by vendor if provided
     if (vendorId) {
@@ -32,6 +37,7 @@ export const getCategories = async (req: NextRequest) => {
         { isDefault: true }
       ];
     }
+    // For admin/master-admin role, no additional filters - show all categories
 
     const categories = await Category.find(query)
       .populate("vendor", "businessName")

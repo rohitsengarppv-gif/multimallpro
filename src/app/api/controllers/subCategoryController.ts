@@ -12,12 +12,17 @@ export const getSubcategories = async (req: NextRequest) => {
     const parentId = searchParams.get("parentId");
     const vendorId = searchParams.get("vendorId");
     const role = searchParams.get("role") || "vendor";
-    const status = searchParams.get("status") || "active";
+    const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
 
-    const query: any = { status };
+    const query: any = {};
+
+    // Only filter by status if explicitly provided
+    if (status) {
+      query.status = status;
+    }
 
     if (parentId) {
       query.parentCategory = parentId;
@@ -35,6 +40,7 @@ export const getSubcategories = async (req: NextRequest) => {
         { isDefault: true }
       ];
     }
+    // For admin/master-admin role, no additional filters - show all subcategories
 
     const subcategories = await SubCategory.find(query)
       .populate("vendor", "businessName")
