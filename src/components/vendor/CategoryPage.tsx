@@ -490,7 +490,7 @@ export default function CategoryPage() {
               <div className="relative overflow-hidden">
                 <div className="aspect-square bg-gray-100 relative">
                   <img
-                    src={typeof category.image === 'object' ? category.image.url : category.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f3f4f6'/%3E%3Ctext x='200' y='200' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af' text-anchor='middle' dominant-baseline='middle'%3ENo Image%3C/text%3E%3C/svg%3E"}
+                    src={category.image && typeof category.image === 'object' ? category.image.url : category.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f3f4f6'/%3E%3Ctext x='200' y='200' font-family='Arial, sans-serif' font-size='16' fill='%239ca3af' text-anchor='middle' dominant-baseline='middle'%3ENo Image%3C/text%3E%3C/svg%3E"}
                     alt={category.name}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     onError={(e) => {
@@ -618,7 +618,7 @@ export default function CategoryPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={typeof category.image === 'object' ? category.image.url : category.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23f3f4f6'/%3E%3Ctext x='20' y='20' font-family='Arial, sans-serif' font-size='8' fill='%239ca3af' text-anchor='middle' dominant-baseline='middle'%3ENo%3C/text%3E%3C/svg%3E"}
+                          src={category.image && typeof category.image === 'object' ? category.image.url : category.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23f3f4f6'/%3E%3Ctext x='20' y='20' font-family='Arial, sans-serif' font-size='8' fill='%239ca3af' text-anchor='middle' dominant-baseline='middle'%3ENo%3C/text%3E%3C/svg%3E"}
                           alt={category.name}
                           className="w-10 h-10 rounded-lg object-cover"
                           onError={(e) => {
