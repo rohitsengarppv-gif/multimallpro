@@ -92,12 +92,20 @@ export default function DiscountPage() {
 
       const response = await fetch(`/api/routes/discounts?${params}`);
       const data = await response.json();
+      
+      console.log('API Response:', data);
+      console.log('Discounts array:', data.data);
 
-      if (data.success) {
-        setDiscounts(data.data.discounts);
+      if (data.success && Array.isArray(data.data)) {
+        console.log('Setting discounts:', data.data.length, 'items');
+        setDiscounts(data.data);
+      } else {
+        setDiscounts([]);
+        console.warn('Invalid discounts data received:', data);
       }
     } catch (error) {
       console.error('Error fetching discounts:', error);
+      setDiscounts([]); // Ensure discounts is always an array
     } finally {
       setLoading(false);
     }
@@ -327,15 +335,20 @@ export default function DiscountPage() {
     }
   };
 
-  const filteredDiscounts = discounts.filter(discount => {
+  const filteredDiscounts = (discounts || []).filter(discount => {
     const matchesSearch = discount.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          discount.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || discount.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const activeDiscounts = discounts.filter(d => d.status === 'active').length;
-  const totalUsage = discounts.reduce((sum, d) => sum + d.usageCount, 0);
+  console.log('Total discounts:', discounts?.length || 0);
+  console.log('Filtered discounts:', filteredDiscounts.length);
+  console.log('Search term:', searchTerm);
+  console.log('Status filter:', statusFilter);
+
+  const activeDiscounts = (discounts || []).filter(d => d.status === 'active').length;
+  const totalUsage = (discounts || []).reduce((sum, d) => sum + d.usageCount, 0);
 
   return (
     <div className="space-y-6">
