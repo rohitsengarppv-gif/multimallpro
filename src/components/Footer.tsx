@@ -55,9 +55,9 @@ export default function Footer() {
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider text-gray-800">Get in Touch</h4>
             <ul className="mt-3 space-y-2 text-sm text-gray-600">
-              <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> +1 (555) 123-4567</li>
+              <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> +91 9087654321</li>
               <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> support@multivendor.com</li>
-              <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> New York, NY</li>
+              <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> Ghaziabad , Uttar Pradesh</li>
             </ul>
             <h4 className="mt-6 text-sm font-bold uppercase tracking-wider text-gray-800">Legal</h4>
             <ul className="mt-3 space-y-2 text-sm text-gray-600">

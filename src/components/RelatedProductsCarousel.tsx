@@ -24,8 +24,8 @@ export default function RelatedProductsCarousel() {
           const transformedProducts: ProductCardData[] = data.data.products.map((product: any) => ({
             id: product._id,
             name: product.name,
-            price: product.price,
-            originalPrice: product.comparePrice || undefined,
+            price: product.comparePrice || undefined,
+            originalPrice: product.price,
             rating: product.rating || 4.0,
             reviews: product.reviewCount || 0,
             image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x400?text=No+Image",

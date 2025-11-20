@@ -91,21 +91,29 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
   }, [isOpen]);
 
   // Update item quantity
-  const updateQuantity = async (productId: string, newQuantity: number, variant?: any) => {
+  const updateQuantity = async (productId: any, newQuantity: number, variant?: any) => {
     if (newQuantity < 1) return;
 
     const userId = getUserId();
     if (!userId) return;
 
+    // Normalize productId in case it is a populated object
+    const rawProductId: any = productId;
+    const normalizedProductId =
+      rawProductId && typeof rawProductId === "object" && (rawProductId as any)._id
+        ? String((rawProductId as any)._id)
+        : String(rawProductId);
+
     console.log("=== UPDATE QUANTITY DEBUG ===");
-    console.log("ProductId:", productId);
+    console.log("ProductId (raw):", productId);
+    console.log("ProductId (normalized):", normalizedProductId);
     console.log("New Quantity:", newQuantity);
     console.log("Variant:", variant);
     console.log("User ID:", userId);
 
     try {
       const requestBody = { 
-        productId, 
+        productId: normalizedProductId, 
         quantity: newQuantity,
         variant: variant || undefined,
       };
@@ -139,9 +147,16 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
   };
 
   // Remove item from cart
-  const removeItem = async (productId: string, variant?: any) => {
+  const removeItem = async (productId: any, variant?: any) => {
     const userId = getUserId();
     if (!userId) return;
+
+    // Normalize productId in case it is a populated object
+    const rawProductId: any = productId;
+    const normalizedProductId =
+      rawProductId && typeof rawProductId === "object" && (rawProductId as any)._id
+        ? String((rawProductId as any)._id)
+        : String(rawProductId);
 
     try {
       const response = await fetch("/api/cart", {
@@ -151,7 +166,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
           "x-user-id": userId,
         },
         body: JSON.stringify({ 
-          productId,
+          productId: normalizedProductId,
           variant: variant || undefined,
         }),
       });
@@ -327,8 +342,8 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
               {/* Summary */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">₹{subtotal.toFixed(2)}</span>
+                  <span className="text-gray-900">Subtotal</span>
+                  <span className="text-gray-900 font-medium">₹{subtotal.toFixed(2)}</span>
                 </div>
                 
                 {savings > 0 && (
@@ -350,9 +365,9 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                   <span className="font-medium">₹{tax.toFixed(2)}</span>
                 </div>
                 
-                <div className="border-t border-gray-300 pt-2 flex justify-between text-lg font-bold">
+                <div className="border-t border-gray-300 text-gray-900 pt-2 flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-rose-600">₹{total.toFixed(2)}</span>
+                  <span className="text-rose-900">₹{total.toFixed(2)}</span>
                 </div>
               </div>
 

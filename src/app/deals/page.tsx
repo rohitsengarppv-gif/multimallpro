@@ -447,11 +447,9 @@ export default function DealsPage() {
               
                 
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl font-bold text-rose-600">₹{deal.salePrice}</span>
-                  <span className="text-lg text-gray-500 line-through">₹{deal.originalPrice}</span>
-                  <span className="text-sm text-green-600 font-semibold">
-                    Save ₹{(deal.originalPrice - deal.salePrice).toFixed(2)}
-                  </span>
+                  <span className="text-2xl font-bold text-rose-600">₹{deal.originalPrice}</span>
+                  <span className="text-lg text-gray-500 line-through">₹{deal.salePrice}</span>
+                 
                 </div>
 
                 {/* Progress Bar */}

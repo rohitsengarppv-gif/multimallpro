@@ -169,6 +169,15 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
     }
   };
 
+  // Ensure we always show the lower price as the main (discounted) price
+  const hasBothPrices = typeof product.originalPrice === "number" && product.originalPrice > 0;
+  const effectivePrice = hasBothPrices
+    ? Math.min(product.price, product.originalPrice as number)
+    : product.price;
+  const crossedPrice = hasBothPrices
+    ? Math.max(product.price, product.originalPrice as number)
+    : undefined;
+
   return (
     <div className={`group relative bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] ${className}`}>
       {/* Product Image */}
@@ -242,9 +251,9 @@ export default function ProductCard({ product, className = "" }: ProductCardProp
           
           {/* Price */}
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-gray-900">₹{product.price}</span>
-            {product.originalPrice && (
-              <span className="text-sm text-gray-500 line-through">₹{product.originalPrice}</span>
+            <span className="text-lg font-bold text-gray-900">₹{effectivePrice}</span>
+            {crossedPrice !== undefined && crossedPrice > effectivePrice && (
+              <span className="text-sm text-gray-500 line-through">₹{crossedPrice}</span>
             )}
           </div>
         </Link>

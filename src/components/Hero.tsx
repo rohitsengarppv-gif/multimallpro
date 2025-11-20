@@ -379,7 +379,7 @@ export default function Hero() {
                 COLORFUL PILLOWS
               </p>
               <p className="text-xs text-white/90">
-                Starts at <span className="text-white font-bold text-lg">$29.99</span>
+                Starts at <span className="text-white font-bold text-lg">₹299</span>
               </p>
               <button className="mt-3 text-xs text-white hover:text-rose-300 font-semibold flex items-center gap-1 transition-colors duration-200">
                 Shop now <ChevronRight className="h-3 w-3" />
@@ -400,7 +400,7 @@ export default function Hero() {
                 <span>💎</span>
                 PREMIUM
               </div>
-              <p className="text-white font-black text-2xl mb-1">$49.99</p>
+              <p className="text-white font-black text-2xl mb-1">₹499</p>
               <p className="text-sm font-bold text-white/90 uppercase tracking-wide mb-3">
                 INTERIOR DESIGN
               </p>

@@ -571,13 +571,11 @@ export default function FeaturedPage() {
                 </div>
                 
                 <div className="flex items-center gap-3 mb-6">
-                  <span className="text-2xl font-bold text-gray-900">${product.price}</span>
-                  {product.originalPrice && (
+                  <span className="text-2xl font-bold text-gray-900">Rs.{product.originalPrice}</span>
+                  {product.price && (
                     <>
-                      <span className="text-lg text-gray-500 line-through">${product.originalPrice}</span>
-                      <span className="text-sm text-green-600 font-semibold">
-                        Save ${(product.originalPrice - product.price).toFixed(2)}
-                      </span>
+                      <span className="text-lg text-gray-500 line-through">Rs.{product.price}</span>
+                     
                     </>
                   )}
                 </div>

@@ -7,6 +7,7 @@ type Item = {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number;
   img: string;
   rating: number;
   brand: string;
@@ -33,18 +34,35 @@ export default function ProductsCarousel() {
 
         if (data.success && data.data.products) {
           // Transform to Item format
-          const transformedProducts: Item[] = data.data.products.map((product: any) => ({
-            id: product._id,
-            title: product.name,
-            price: product.price,
-            img: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x300?text=No+Image",
-            rating: product.rating || Math.floor(Math.random() * 2) + 4, // 4-5 stars for latest products
-            brand: product.vendor?.businessName || "Latest",
-            inStock: product.stock > 0,
-            discount: product.comparePrice 
-              ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
-              : undefined
-          }));
+          const transformedProducts: Item[] = data.data.products.map((product: any) => {
+            const basePrice = Number(product.price) || 0;
+            const comparePrice = typeof product.comparePrice === "number" ? Number(product.comparePrice) : undefined;
+            const hasBoth = typeof comparePrice === "number" && comparePrice > 0;
+
+            const effectivePrice = hasBoth
+              ? Math.min(basePrice, comparePrice as number)
+              : basePrice;
+
+            const crossedPrice = hasBoth
+              ? Math.max(basePrice, comparePrice as number)
+              : undefined;
+
+            const discount = crossedPrice && crossedPrice > effectivePrice
+              ? Math.round(((crossedPrice - effectivePrice) / crossedPrice) * 100)
+              : undefined;
+
+            return {
+              id: product._id,
+              title: product.name,
+              price: effectivePrice,
+              originalPrice: crossedPrice,
+              img: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400x300?text=No+Image",
+              rating: product.rating || Math.floor(Math.random() * 2) + 4, // 4-5 stars for latest products
+              brand: product.vendor?.businessName || "Latest",
+              inStock: product.stock > 0,
+              discount,
+            } as Item;
+          });
 
           setProducts(transformedProducts);
         }
@@ -80,7 +98,7 @@ export default function ProductsCarousel() {
           productId: item.id,
           name: item.title,
           price: item.price,
-          originalPrice: item.discount ? item.price * (1 + item.discount / 100) : undefined,
+          originalPrice: item.originalPrice,
           quantity: 1,
           image: item.img,
           brand: item.brand,
@@ -96,10 +114,11 @@ export default function ProductsCarousel() {
           id: item.id,
           name: item.title,
           price: item.price,
+          originalPrice: item.originalPrice,
           image: item.img,
           brand: item.brand,
           inStock: item.inStock,
-          discount: item.discount
+          discount: item.discount,
         });
       } else {
         console.error("Failed to add to cart:", data.message);
@@ -148,7 +167,12 @@ export default function ProductsCarousel() {
               <div className="p-3">
                 <h5 className="line-clamp-2 h-10 text-sm font-semibold text-gray-800">{item.title}</h5>
                 <div className="mt-1 flex items-center justify-between">
-                  <span className="text-rose-600 font-bold">${item.price.toFixed(2)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-rose-600 font-bold">₹{item.price.toFixed(0)}</span>
+                    {item.originalPrice && item.originalPrice > item.price && (
+                      <span className="text-xs text-gray-500 line-through">₹{item.originalPrice.toFixed(0)}</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-0.5 text-amber-500">
                     {Array.from({ length: 5 }).map((_, s) => (
                       <Star key={s} className={`h-4 w-4 ${s < item.rating ? 'fill-current' : 'opacity-30'}`} />

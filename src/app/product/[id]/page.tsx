@@ -348,6 +348,25 @@ export default function ProductDetailsPage() {
       console.log("variantData to send:", variantData);
       console.log("Object.keys length:", Object.keys(selectedVariants).length);
       console.log("========================");
+
+      // Normalize pricing so discount is always non-negative
+      const basePrice = Number(product.price) || 0;
+      const comparePrice =
+        typeof product.comparePrice === "number" ? Number(product.comparePrice) : undefined;
+      const hasBothPrices = typeof comparePrice === "number" && comparePrice > 0;
+
+      const effectivePrice = hasBothPrices
+        ? Math.min(basePrice, comparePrice as number)
+        : basePrice;
+
+      const crossedPrice = hasBothPrices
+        ? Math.max(basePrice, comparePrice as number)
+        : undefined;
+
+      const discount =
+        crossedPrice && crossedPrice > effectivePrice
+          ? Math.round(((crossedPrice - effectivePrice) / crossedPrice) * 100)
+          : undefined;
       
       const response = await fetch("/api/cart", {
         method: "POST",
@@ -358,14 +377,12 @@ export default function ProductDetailsPage() {
         body: JSON.stringify({
           productId: product._id || product.id,
           name: product.name,
-          price: product.price,
-          originalPrice: product.comparePrice,
+          price: effectivePrice,
+          originalPrice: crossedPrice,
           quantity: quantity,
           image: product.mainImage?.url || product.images?.[0]?.url || "https://via.placeholder.com/400",
           brand: vendor?.businessName || "Unknown",
-          discount: product.comparePrice 
-            ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
-            : undefined,
+          discount,
           ...(variantData && { variant: variantData }),
         }),
       });
@@ -377,14 +394,12 @@ export default function ProductDetailsPage() {
         addItem({
           id: product._id || product.id,
           name: product.name,
-          price: product.price,
-          originalPrice: product.comparePrice,
+          price: effectivePrice,
+          originalPrice: crossedPrice,
           image: product.mainImage?.url || product.images?.[0]?.url,
           brand: vendor?.businessName || "Unknown",
           inStock: product.stock > 0,
-          discount: product.comparePrice 
-            ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
-            : undefined,
+          discount,
           variant: {
             color: selectedColor,
             size: selectedSize
@@ -597,9 +612,9 @@ export default function ProductDetailsPage() {
 
             {/* Price */}
             <div className="flex items-center gap-2 sm:gap-4 mb-3 sm:mb-4 flex-wrap">
-              <span className="text-2xl sm:text-3xl font-bold text-gray-900">₹{product.price}</span>
+              <span className="text-2xl sm:text-3xl font-bold text-gray-900">₹{product.comparePrice}</span>
               {product.comparePrice && (
-                <span className="text-lg sm:text-xl text-gray-500 line-through">₹{product.comparePrice}</span>
+                <span className="text-lg sm:text-xl text-gray-500 line-through">₹{product.price}</span>
               )}
               {product.comparePrice && (
                 <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs sm:text-sm font-semibold">
